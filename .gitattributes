@@ -1,0 +1,17 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Linguist to ignore 
+*.js linguist-vendored
+*.css linguist-vendored
+*.jar linguist-vendored
+*.xml linguist-vendored
+*.exe linguist-vendored
+
+# Graphics
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.tif binary
+*.ico binary

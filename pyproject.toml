@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "rdb_spotify_tags_etl_py"
+version = "1.0.3"
+description = "load music tags: ['mp3','.m4a','.flac','.wma'] from JSON to Postgres"
+authors = ["Emile Averill <cloud.dev.apps@averille.com>"]
+
+[tool.poetry.dependencies]
+python = ">=3.9,<3.10"
+pandas = "*"
+pathvalidate = "*"
+pendulum = "*"
+psycopg2-binary = "*"
+rapidfuzz = "*"
+spotipy = "*"
+toml = "*"
+
+[tool.poetry.dev-dependencies]
+coverage = "*"
+flake8 = "*"
+pre-commit = "*"
+pylint = "*"
+pytest = "*"
+yapf = "*"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

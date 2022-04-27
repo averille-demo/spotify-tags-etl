@@ -1,0 +1,41 @@
+version: "3"
+
+services:
+  # https://hub.docker.com/_/postgres/
+  postgres:
+    image: postgres:13
+    restart: always
+    # 5432 (default), 5413 (custom)
+    ports:
+    # <host_port>:<container_port>
+      - "5413:5413"
+    environment:
+     - POSTGRES_USER=run_admin_run
+     - POSTGRES_PASSWORD=run_pass_run
+     - POSTGRES_DB=media_db
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    # notify backend to start on custom port
+    command: ["-p", "5413"]
+
+  # https://hub.docker.com/r/dpage/pgadmin4
+  pgadmin4:
+    image: dpage/pgadmin4:6
+    restart: always
+    ports:
+      - "8085:80"
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=run_admin_run@protonmail.com
+      - PGADMIN_DEFAULT_PASSWORD=run_pass_run
+    volumes:
+        - pgadmin:/var/lib/pgadmin
+        - ./app/config/pg_admin_servers.json:/pgadmin4/servers.json
+        - ./data:/var/lib/pgadmin/storage/data
+        # - sudo chown -R 5050:5050 /var/lib/pgadmin
+    depends_on:
+      - postgres
+
+volumes:
+    # mount volumes for database files
+    postgres:
+    pgadmin:
