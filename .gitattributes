@@ -1,17 +1,17 @@
 # Auto detect text files and perform LF normalization
-* text=auto
+*   text=auto
+*.py    text diff=python
 
-# Linguist to ignore 
-*.js linguist-vendored
-*.css linguist-vendored
-*.jar linguist-vendored
-*.xml linguist-vendored
-*.exe linguist-vendored
+# bash scripts, keep linux LF for newlines
+*.sh    text eol=lf
+*.sql   text eol=lf
 
-# Graphics
-*.png binary
-*.jpg binary
-*.jpeg binary
-*.gif binary
-*.tif binary
-*.ico binary
+# images
+*.png   binary
+*.jpg   binary
+
+# media
+*.mp4   binary
+*.mp3   binary
+*.mp3   binary
+*.wav   binary

@@ -1,124 +1,37 @@
-# os system files
+# Hidden junk
 .DS_Store
 desktop.ini
-
-# temp files
 *._
+
+# Temp files
 *~*
-*.bak
-
-# file extensions
-*.csv
-*.gzip
-*.log
+*.bak*
+*_temp*
 *.lock
-*.docx
-*.pdf
-*.xlsx
-*.sh
+*.log
 
-# other IDEs
+# Documents
+**/info/
+*.csv
+*.pdf
+*.doc*
+*.od*
+*.xls*
+*.txt
+
+# Development environments
 .idea*/
 .venv*/
 *.code-workspace
 .vscode/
 
-# subdirectories
-**/docs/
-**/json/
-**/pep8_errors/
-**/query/
-**/sql/
-**/test/
-
-# api keys
-# ignore any files with 'private' regardless of extension in /etl/some_etl/config/ subdirectory
-**/config/*private*
-*.cache
-
-# os system files
-desktop.ini
-.DS_Store
-
-# temp files: 
-*._
-*~*
-*.bak
-
-# IDEs
-.conda/
-.idea/
-*.code-workspace
-.vscode/
-
-# subfolders
-**/docs/
-**/json/
-**/pep8_errors/
-
-# test suite
-**/tests/
-*check_*
-*.coverage
-
-# file extentions
-*.docx
-*.txt
-*.csv
-*.bz2
-*.gzip
-*.gz
-*.xz
-*.zip
-*.lock
-*.log
-*.yml
-
-# api keys
-**/config/*private*
-*.git-credentials
-
-#IDE metadata
-.idea/
+# API credentials
+*secret*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
-
-# C extensions
-*.so
-
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-pyapp/custom/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-pip-wheel-metadata/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
 
 # Unit test / coverage reports
 htmlcov/
@@ -134,79 +47,8 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 
-# Translations
-*.mo
-*.pot
-
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-
-# Flask stuff:
-instance/
-.webassets-cache
-
-# Scrapy stuff:
-.scrapy
-
 # Sphinx documentation
 docs/_build/
 
-# PyBuilder
-target/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# IPython
-profile_default/
-ipython_config.py
-
-# pyenv
-.python-version
-
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
-
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow
-__pypackages__/
-
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
 # mypy
 .mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/

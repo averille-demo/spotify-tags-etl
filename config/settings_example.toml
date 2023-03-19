@@ -1,11 +1,11 @@
-[etl]
+[project]
   name = "rdb_spotify_tags_etl_py"
   timezone = "America/Los_Angeles"
   sources = ["json.spotify.api", "json.media.parser"]
   sinks = ["postgres.db"]
 
 # postgres port: 5432 (default), 5413 (custom)
-[postgres.development]
+[postgres.dev]
   endpoint = "localhost"
   username = "run_admin_run"
   password = "run_pass_run"
@@ -13,7 +13,9 @@
   port = "5413"
 
 # https://developer.spotify.com/documentation/web-api/
-[spotify.development]
+[spotify.dev]
   client_id = "123456789abcdefg"        # <-- enter your CLIENT_ID
   client_secret = "abcdefg123456789"    # <-- enter your CLIENT_SECRET
-  redirect_uri = "http://localhost/"
+  redirect_uri = "http://localhost"
+  scope="user-library-read"
+  timeout = 5
