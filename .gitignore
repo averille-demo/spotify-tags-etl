@@ -5,6 +5,7 @@ desktop.ini
 
 # Temp files
 *~*
+**/api/
 *.bak*
 *_temp*
 *.lock
