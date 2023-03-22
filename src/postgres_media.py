@@ -1,6 +1,6 @@
-"""Media driver module to insert JSON media tags into PostgreSQL.
+"""PostgreSQL client wrapper to setup and query backend.
 
-https://www.psycopg.org/docs/errors.html
+https://www.psycopg.org/docs/index.html
 """
 import pprint as pp
 from pathlib import Path
@@ -9,8 +9,8 @@ from typing import Dict, List, Tuple
 import pandas as pd
 import pendulum
 import psycopg2
-from psycopg2 import DatabaseError, InterfaceError, OperationalError
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT, connection
+from psycopg2.extras import NamedTupleCursor
 
 from src.spotify_client import SpotifyClient
 from src.util.logger import get_relative_path, init_logger
@@ -32,9 +32,9 @@ class PostgresMedia:
         """Dunder methods enter/exit needed for with() context."""
         return self
 
-    def __init__(self, spotify_client: SpotifyClient):
+    def __init__(self):
         """Initialize class."""
-        self.spotify_client: SpotifyClient = spotify_client
+        self.spotify_client: SpotifyClient = SpotifyClient()
         self._config: DatabaseConfig = load_db_config()
         self.is_loaded: bool = False
         self.db_conn: connection = None
@@ -57,9 +57,9 @@ class PostgresMedia:
                     self.db_conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
                     self.log.info(f"connected: {self._config.database}")
                     return True
-        except OperationalError:
+        except psycopg2.OperationalError:
             self.log.exception(f"connection timeout: ({self._config.timeout}s)")
-        except (OSError, DatabaseError, InterfaceError, OperationalError):
+        except (psycopg2.DatabaseError, psycopg2.InterfaceError):
             self.log.exception(f"{self._config.database}")
         return False
 
@@ -78,7 +78,7 @@ class PostgresMedia:
             pg_ver = str(self.db_conn.server_version)
             print(f"database: {self._config.database}\t version: {pg_ver}")
             self.show_tables()
-        except (AttributeError, DatabaseError, InterfaceError, OperationalError):
+        except (AttributeError, psycopg2.DatabaseError, psycopg2.InterfaceError, psycopg2.OperationalError):
             self.log.exception(f"{self._config.database}")
 
     def query(self, query: str, params: List) -> List[Tuple]:
@@ -91,7 +91,7 @@ class PostgresMedia:
             if isinstance(query, str):
                 if not params:
                     params = []
-                with self.db_conn.cursor() as cursor:
+                with self.db_conn.cursor(cursor_factory=NamedTupleCursor) as cursor:
                     # optional: use mogrify method to format query string
                     params_query = cursor.mogrify(query=query, vars=params)
                     cursor.execute(params_query)
@@ -99,7 +99,7 @@ class PostgresMedia:
                     # convert mogrify() bytes to string with decode()
                     print(params_query.decode())
                     pp.pprint(object=result_set, indent=2, width=120, compact=True)
-        except (SyntaxError, DatabaseError, InterfaceError, OperationalError):
+        except (SyntaxError, psycopg2.DatabaseError, psycopg2.InterfaceError, psycopg2.OperationalError):
             self.log.exception(f"{query}")
         return result_set
 
@@ -115,7 +115,7 @@ class PostgresMedia:
                 else:
                     self.log.info(f"rolname: '{result_set[0]}' found")
                     return True
-        except (DatabaseError, InterfaceError, OperationalError):
+        except (psycopg2.DatabaseError, psycopg2.InterfaceError, psycopg2.OperationalError):
             self.log.exception(f"rolname: {role_name}")
         return False
 
@@ -124,16 +124,17 @@ class PostgresMedia:
         try:
             if isinstance(role_name, str) and isinstance(password, str):
                 if not self.verify_role_exists(role_name=role_name):
+                    expiration_date = pendulum.now().add(months=2).to_date_string()
                     query = (
                         "CREATE ROLE %s WITH LOGIN PASSWORD '%s' "
                         "CREATEDB CREATEROLE NOINHERIT CONNECTION LIMIT -1 "
-                        "VALID UNTIL '2023-12-31';"
+                        f"VALID UNTIL '{expiration_date}';"
                     )
                     with self.db_conn.cursor() as cursor:
                         cursor.execute(query, [role_name, password])
                         self.log.info(f"added role: '{role_name}'")
                         return True
-        except (DatabaseError, InterfaceError, OperationalError):
+        except (psycopg2.DatabaseError, psycopg2.InterfaceError, psycopg2.OperationalError):
             self.log.exception(f"failed to add role: '{role_name}'")
         return False
 
@@ -156,7 +157,7 @@ class PostgresMedia:
                     cursor.execute(query)
                     self.log.info(f"database: '{self._config.database}' created")
                     return True
-        except (DatabaseError, InterfaceError, OperationalError):
+        except (psycopg2.DatabaseError, psycopg2.InterfaceError, psycopg2.OperationalError):
             self.log.exception(f"database: '{self._config.database}'")
         return False
 
@@ -169,7 +170,7 @@ class PostgresMedia:
                     if cursor.rowcount == -1:
                         # query was successful
                         return True
-        except (DatabaseError, InterfaceError, OperationalError):
+        except (psycopg2.DatabaseError, psycopg2.InterfaceError, psycopg2.OperationalError):
             self.log.exception(f"{self._config.database}")
         return False
 
@@ -189,45 +190,49 @@ class PostgresMedia:
                 table_map[table_name].remove("id")
         return table_map
 
-    def load_df(self, df: pd.DataFrame) -> bool:
+    def load_df(self, df: pd.DataFrame, truncate: bool = False) -> bool:
         """Driver to parse JSON file and commit to Postgres database."""
         loaded_ok = {}
-        try:
-            if isinstance(df, pd.DataFrame):
-                for i, series in df.iterrows():
-                    artist_name = series["artist_name"]
-                    album_title = series["album_title"]
-                    track_number = series["track_number"]
-                    track_title = series["track_title"]
-
-                    # update values from spotify queries prior to load to postgres
-                    if self.spotify_client:
-                        series["artist_id"] = self.spotify_client.get_artist_id(artist_name)
-                        series["album_id"] = self.spotify_client.get_album_id(series["artist_id"], album_title)
-
-                    # create unique key (no duplicates)
-                    track_tag = f"{i:03d} | {artist_name} | {album_title} | {track_number:02d}-{track_title}"
-
-                    # split out each data row to dedicated sql tables
-                    for table, columns in self.query_table_columns().items():
-                        try:
-                            # select subset of columns from dataframe
-                            with self.db_conn.cursor() as cursor:
-                                query = (
-                                    f"INSERT INTO {table} ({', '.join(columns)}) "
-                                    f"VALUES ({', '.join(['%s'] * len(columns))})"
-                                )
-                                cursor.execute(query=query, vars=series[columns])
-                                print(cursor.rowcount, query)
-                                if cursor.rowcount == 1:
-                                    loaded_ok[track_tag] = True
-                                else:
-                                    self.log.error(f"{table} insert row: {track_tag}")
-                                    loaded_ok[track_tag] = False
-                        except (KeyError, IndexError, DatabaseError):
-                            self.log.exception(f"table: {table} track: '{track_tag}'")
-        except (pd.errors.DtypeWarning, pd.errors.ParserWarning):
-            self.log.exception("{}")
+        if isinstance(df, pd.DataFrame):
+            if truncate:
+                df = df.head(1)
+            for i, series in df.iterrows():
+                # update values from spotify queries prior to load to postgres
+                if self.spotify_client:
+                    series["artist_id"] = self.spotify_client.get_artist_id(
+                        artist_name=series["artist_name"],
+                    )
+                    series["album_id"] = self.spotify_client.get_album_id(
+                        artist_id=series["artist_id"],
+                        album_title=series["album_title"],
+                    )
+                    series["track_id"] = self.spotify_client.get_track_id(
+                        artist_name=series["artist_name"],
+                        album_title=series["album_title"],
+                        track_title=series["track_title"],
+                    )
+                # create unique key (no duplicates even with same artist/song across different albums)
+                track_tag = (
+                    f"{i:03d} | {series['artist_name']} | {series['album_title']} | "
+                    f"{series['track_number']:02d}-{series['track_title']}"
+                )
+                # split out each data row in json file to dedicated database tables
+                for table, columns in self.query_table_columns().items():
+                    try:
+                        with self.db_conn.cursor() as cursor:
+                            query = (
+                                f"INSERT INTO {table} ({', '.join(columns)}) "
+                                f"VALUES ({', '.join(['%s'] * len(columns))})"
+                            )
+                            # select ordered subset of columns from series
+                            cursor.execute(query=query, vars=series[columns])
+                            if cursor.rowcount == 1:
+                                loaded_ok[track_tag] = True
+                            else:
+                                self.log.error(f"{table} insert row: {track_tag}")
+                                loaded_ok[track_tag] = False
+                    except (pd.errors.DtypeWarning, pd.errors.ParserWarning, psycopg2.DatabaseError):
+                        self.log.exception(f"table: {table} track: '{track_tag}'")
         # only return true if all inserts were successful
         return next((status for status in list(loaded_ok.values())), True)
 
@@ -240,7 +245,7 @@ class PostgresMedia:
         return paths
 
     def load_data(self) -> bool:
-        """Loads source JSON  non-recursively from source data folder."""
+        """Loads JSON file(s) from source data folder."""
         processed_ok = {}
         try:
             self.log.info(f"processing: {get_relative_path(DATA_PATH)}")

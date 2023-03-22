@@ -32,7 +32,7 @@ GENRE_SELECT = "SELECT artist_name, music_genre FROM genre WHERE music_genre IN 
 
 FILE_SELECT = "SELECT file_name, encoding, file_ext FROM metadata WHERE file_ext = (%s);"
 
-AVG_SIZE_SELECT = "SELECT AVG(file_size) FROM metadata;"
+AVG_SIZE_SELECT = "SELECT ROUND( AVG(file_size) / (1024 * 1024) , 2) FROM metadata;"
 
 
 def build_placeholders(query: str, params: list) -> str:

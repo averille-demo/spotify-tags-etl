@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "rdb_spotify_tags_etl_py"
-version = "1.2.0"
-description = "DEMO: load music tags: ['mp3','.m4a','.flac','.wma'] from JSON to Postgres"
+version = "1.2.1"
+description = "DEMO: load music tags: ['mp3','.m4a','.flac','.wma'] from JSON to postgres backend"
 authors = ["Emile Averill <cloud.dev.apps@averille.com>"]
 readme = "README.md"
 license = "MIT"

@@ -2,7 +2,6 @@
 
 https://docs.pydantic.dev/usage/settings/
 """
-import locale
 import platform
 import tomllib
 from pathlib import Path
@@ -11,12 +10,16 @@ from typing import Any, Dict, Final, List, Optional
 from pydantic import AnyUrl, BaseSettings, conint, validator
 
 PROJECT_PATH: Final[Path] = Path(__file__).resolve().parent.parent.parent
-DEBUG: Final[bool] = False
+DEBUG: Final[bool] = True
 VALID_DB_ENV = frozenset(("dev", "prod"))
 
 DATA_PATH: Final[Path] = Path(PROJECT_PATH, "data", "input")
 if not DATA_PATH.is_dir():
     raise FileNotFoundError(f"DATA folder does not exist: {DATA_PATH}")
+
+API_PATH: Final[Path] = Path(PROJECT_PATH, "api")
+if not API_PATH.is_dir():
+    API_PATH.mkdir(parents=True, exist_ok=True)
 
 SQL_PATH: Final[Path] = Path(PROJECT_PATH, "src", "sql")
 if not SQL_PATH.is_dir():
@@ -85,6 +88,7 @@ def load_db_config(
         PostgresConfig: pydantic settings object
     """
     config = open_toml()
+    print(config)
     return DatabaseConfig(
         name=config["project"]["name"],
         timezone=config["project"]["timezone"],
@@ -149,8 +153,8 @@ class PyProjectToolPoetry(BaseSettings):
     name: str
     version: str
     description: str
-    license: Optional[str]
     authors: List[str]
+    license: Optional[str]
     readme: Optional[str]
     repository: Optional[str]
     documentation: Optional[str]
@@ -188,9 +192,9 @@ def parse_pyproject() -> PyProjectToolPoetry:
         if isinstance(key, str):
             parsed_toml[key] = pyproject.get(key, None)
 
-    host_enc = locale.getpreferredencoding()
+    # add host platform information
     host_arch = f"{platform.system()} {platform.architecture()[0]} {platform.machine()}"
-    parsed_toml["host"] = f"{platform.node():6} ({host_enc} {host_arch:16})"
+    parsed_toml["host"] = f"{platform.node()} ({host_arch})"
 
     # build pydantic BaseSettings object with **kwargs
     return PyProjectToolPoetry.parse_obj(parsed_toml)

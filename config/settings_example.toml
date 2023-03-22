@@ -4,18 +4,20 @@
   sources = ["json.spotify.api", "json.media.parser"]
   sinks = ["postgres.db"]
 
-# postgres port: 5432 (default), 5413 (custom)
+# postgres port: 5432 (default), 5454 (custom)
 [postgres.dev]
   endpoint = "localhost"
-  username = "run_admin_run"
-  password = "run_pass_run"
+  username = ""
+  password = ""
   database = "media_db"
-  port = "5413"
+  port = 5454
+  timeout = 5
 
 # https://developer.spotify.com/documentation/web-api/
 [spotify.dev]
   client_id = "123456789abcdefg"        # <-- enter your CLIENT_ID
   client_secret = "abcdefg123456789"    # <-- enter your CLIENT_SECRET
   redirect_uri = "http://localhost"
+  port = 9000
   scope="user-library-read"
   timeout = 5
