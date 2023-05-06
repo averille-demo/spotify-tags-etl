@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pendulum
 
-from src.postgres_media import PostgresMedia
-from src.sql import params_queries
-from src.util.logger import init_logger
+from media_etl.postgres_media import PostgresMedia
+from media_etl.sql import params_queries
+from media_etl.util.logger import init_logger
 
 MODULE = Path(__file__).resolve().name
 

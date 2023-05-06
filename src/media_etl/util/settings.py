@@ -9,9 +9,11 @@ from typing import Any, Dict, Final, List, Optional
 
 from pydantic import AnyUrl, BaseSettings, conint, validator
 
-PROJECT_PATH: Final[Path] = Path(__file__).resolve().parent.parent.parent
 DEBUG: Final[bool] = True
 VALID_DB_ENV = frozenset(("dev", "prod"))
+
+PROJECT_PATH: Final[Path] = Path(__file__).resolve().parent.parent.parent.parent
+SRC_PATH: Final[Path] = Path(__file__).resolve().parent.parent
 
 DATA_PATH: Final[Path] = Path(PROJECT_PATH, "data", "input")
 if not DATA_PATH.is_dir():
@@ -21,7 +23,7 @@ API_PATH: Final[Path] = Path(PROJECT_PATH, "api")
 if not API_PATH.is_dir():
     API_PATH.mkdir(parents=True, exist_ok=True)
 
-SQL_PATH: Final[Path] = Path(PROJECT_PATH, "src", "sql")
+SQL_PATH: Final[Path] = Path(SRC_PATH, "sql")
 if not SQL_PATH.is_dir():
     raise FileNotFoundError(f"SQL folder does not exist: {SQL_PATH}")
 

@@ -1,6 +1,6 @@
 [tool.poetry]
-name = "rdb_spotify_tags_etl_py"
-version = "1.2.1"
+name = "media_etl"
+version = "1.2.2"
 description = "DEMO: load music tags: ['mp3','.m4a','.flac','.wma'] from JSON to postgres backend"
 authors = ["Emile Averill <cloud.dev.apps@averille.com>"]
 readme = "README.md"
@@ -47,14 +47,13 @@ python_version = "3.11"
 files = "*.py"
 mypy_path = "src"
 explicit_package_bases = false
-namespace_packages = false
-ignore_missing_imports = true
+namespace_packages = true
+ignore_missing_imports = false
 no_implicit_optional = true
 pretty = true
 show_error_codes = true
 disable_error_code = [
     "import"
-
 ]
 
 [tool.pydocstyle]
@@ -65,16 +64,17 @@ max-line-length = 120
 extension-pkg-allow-list = ["pydantic"]
 disable = [
     "consider-using-dict-items",
-    "consider-iterating-dictionary",
     "logging-fstring-interpolation",
     "invalid-name",
-    "no-self-argument",
-    "no-name-in-module",
 ]
 
 [tool.pytest.ini_options]
 pythonpath = [".", "src"]
 testpaths = [".", "tests"]
+
+[virtualenvs]
+in-project = true
+prefer-active-python = true
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

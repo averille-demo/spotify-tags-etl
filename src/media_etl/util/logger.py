@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 from types import TracebackType
 
-from src.util.settings import PROJECT_PATH
+from media_etl.util.settings import PROJECT_PATH
 
 
 def get_relative_path(

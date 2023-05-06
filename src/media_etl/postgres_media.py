@@ -12,9 +12,9 @@ import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT, connection
 from psycopg2.extras import NamedTupleCursor
 
-from src.spotify_client import SpotifyClient
-from src.util.logger import get_relative_path, init_logger
-from src.util.settings import DATA_PATH, SQL_PATH, DatabaseConfig, load_db_config, parse_pyproject
+from media_etl.spotify_client import SpotifyClient
+from media_etl.util.logger import get_relative_path, init_logger
+from media_etl.util.settings import DATA_PATH, SQL_PATH, DatabaseConfig, load_db_config, parse_pyproject
 
 pd.set_option("display.max_rows", 128)
 pd.set_option("expand_frame_repr", False)

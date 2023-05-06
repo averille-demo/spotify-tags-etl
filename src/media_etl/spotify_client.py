@@ -9,9 +9,9 @@ from spotipy import Spotify
 from spotipy.exceptions import SpotifyException
 from spotipy.oauth2 import SpotifyClientCredentials, SpotifyOauthError
 
-from src.sql.offline_ids import OFFLINE_ALBUM_IDS, OFFLINE_ARTIST_IDS, OFFLINE_TRACK_IDS
-from src.util.logger import init_logger
-from src.util.settings import API_PATH, DEBUG, SpotifyApiConfig, load_spotify_config, parse_pyproject
+from media_etl.sql.offline_ids import OFFLINE_ALBUM_IDS, OFFLINE_ARTIST_IDS, OFFLINE_TRACK_IDS
+from media_etl.util.logger import init_logger
+from media_etl.util.settings import API_PATH, DEBUG, SpotifyApiConfig, load_spotify_config, parse_pyproject
 
 
 class SpotifyClient:

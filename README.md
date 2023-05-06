@@ -74,6 +74,7 @@ poetry run pre-commit install --install-hooks
 
 ### Step 3: Setup Docker container
 [Install Docker Desktop](https://www.docker.com/products/docker-desktop)
+
 [Docker Compose Commands](https://docs.docker.com/engine/reference/commandline/compose/)
 ```
 # start backend with convenience script:
@@ -84,7 +85,7 @@ poetry run pre-commit install --install-hooks
 ### Step 4: Run ETL script
 ```
 # with postgres backend running
-poetry run python ./src/etl_pipeline.py
+poetry run python ./src/media_etl/run_pipeline.py
 ```
 
 ## Cleanup and maintenance

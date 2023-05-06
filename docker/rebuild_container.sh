@@ -12,15 +12,14 @@ fi
 PROJECT=$(sed -n 's/^ *name.*=.*"\([^"]*\)".*/\1/p' "$PROJECT_PATH/pyproject.toml")
 VERSION=$(sed -n 's/^ *version.*=.*"\([^"]*\)".*/\1/p' "$PROJECT_PATH/pyproject.toml")
 
-COMPOSE_FILE="$DOCKER_PATH/docker-compose-dev.yaml"
 ENV_FILE="$DOCKER_PATH/config/postgres_secret_dev.env"
-
 if [ ! -f "$ENV_FILE" ]; then
    cp "$DOCKER_PATH/config/postgres_example_dev.env" "$ENV_FILE"
    printf "ERROR: update your credentials: %s\n" "$(basename "$ENV_FILE")"
    exit 1
 fi
 
+COMPOSE_FILE="$DOCKER_PATH/docker-compose-dev.yaml"
 if [ -f "$COMPOSE_FILE" ];
 then
   printf "\nRebuilding container: %s v%s\n" "$PROJECT" "$VERSION"

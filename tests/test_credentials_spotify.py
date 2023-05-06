@@ -1,7 +1,7 @@
 """Tests for parsing spotify credentials as pydantic settings."""
 import pytest
 
-from src.util import settings
+from media_etl.util import settings
 
 
 def test_load_spotify_settings():
