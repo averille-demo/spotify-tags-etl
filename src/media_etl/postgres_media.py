@@ -2,8 +2,8 @@
 
 https://www.psycopg.org/docs/index.html
 """
-import pprint as pp
 from pathlib import Path
+from pprint import pprint
 from typing import Dict, List, Tuple
 
 import pandas as pd
@@ -34,7 +34,7 @@ class PostgresMedia:
 
     def __init__(self):
         """Initialize class."""
-        self.spotify_client: SpotifyClient = SpotifyClient()
+        self.spotify_client: SpotifyClient = SpotifyClient(use_offline=False)
         self._config: DatabaseConfig = load_db_config()
         self.is_loaded: bool = False
         self.db_conn: connection = None
@@ -98,7 +98,7 @@ class PostgresMedia:
                     result_set = cursor.fetchall()
                     # convert mogrify() bytes to string with decode()
                     print(params_query.decode())
-                    pp.pprint(object=result_set, indent=2, width=120, compact=True)
+                    pprint(object=result_set, indent=2, width=120, compact=True)
         except (SyntaxError, psycopg2.DatabaseError, psycopg2.InterfaceError, psycopg2.OperationalError):
             self.log.exception(f"{query}")
         return result_set

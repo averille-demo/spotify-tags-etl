@@ -4,14 +4,14 @@ import sys
 from pathlib import Path
 from types import TracebackType
 
-from media_etl.util.settings import PROJECT_PATH
+from media_etl.util.settings import PROJECT_ROOT
 
 
 def get_relative_path(
     path: Path,
 ) -> str:
     """Truncate file path to last n-parts of project level."""
-    return path.as_posix().replace(PROJECT_PATH.as_posix(), "")
+    return path.as_posix().replace(PROJECT_ROOT.as_posix(), "")
 
 
 class SingleLineFormatter(logging.Formatter):
@@ -55,7 +55,7 @@ class SingleLineFormatter(logging.Formatter):
 
 def init_logger(
     log_name: str,
-    log_file: Path = Path(PROJECT_PATH, "logs", "demo_project.log"),
+    log_file: Path = Path(PROJECT_ROOT, "logs", "demo_project.log"),
 ) -> logging.Logger:
     """Generate custom Logger object writes output to both file and standard output.
 

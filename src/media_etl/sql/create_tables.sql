@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS album (
     artist_id VARCHAR(150) NULL,
     album_title VARCHAR(200) NULL,
     year SMALLINT,
-    album_gain NUMERIC(5,2),
+    album_gain NUMERIC(5, 2),
     album_art VARCHAR(48) NULL,
     extract_date TIMESTAMP WITH TIME ZONE
 );
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS track (
     track_length VARCHAR(16) NULL,
     rating VARCHAR(16) NULL,
     comment VARCHAR(128) NULL,
-    track_gain NUMERIC(5,2),
+    track_gain NUMERIC(5, 2),
     bitrate INT,
     sampling_rate INT,
     extract_date TIMESTAMP WITH TIME ZONE

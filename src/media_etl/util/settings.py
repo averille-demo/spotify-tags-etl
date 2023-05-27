@@ -12,28 +12,28 @@ from pydantic import AnyUrl, BaseSettings, conint, validator
 DEBUG: Final[bool] = True
 VALID_DB_ENV = frozenset(("dev", "prod"))
 
-PROJECT_PATH: Final[Path] = Path(__file__).resolve().parent.parent.parent.parent
 SRC_PATH: Final[Path] = Path(__file__).resolve().parent.parent
+PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parent.parent.parent.parent
 
-DATA_PATH: Final[Path] = Path(PROJECT_PATH, "data", "input")
+DATA_PATH: Final[Path] = Path(PROJECT_ROOT, "data", "input")
 if not DATA_PATH.is_dir():
-    raise FileNotFoundError(f"DATA folder does not exist: {DATA_PATH}")
+    raise NotADirectoryError(f"{DATA_PATH=}")
 
-API_PATH: Final[Path] = Path(PROJECT_PATH, "api")
+API_PATH: Final[Path] = Path(PROJECT_ROOT, "api")
 if not API_PATH.is_dir():
     API_PATH.mkdir(parents=True, exist_ok=True)
 
 SQL_PATH: Final[Path] = Path(SRC_PATH, "sql")
 if not SQL_PATH.is_dir():
-    raise FileNotFoundError(f"SQL folder does not exist: {SQL_PATH}")
+    raise NotADirectoryError(f"{SQL_PATH=}")
 
-TOML_PATH: Final[Path] = Path(PROJECT_PATH, "config", "settings_secret.toml")
+TOML_PATH: Final[Path] = Path(PROJECT_ROOT, "config", "settings_secret.toml")
 if not TOML_PATH.is_file():
-    raise FileNotFoundError(f"TOML file does not exist: {TOML_PATH}")
+    raise FileNotFoundError(f"{TOML_PATH=}")
 
-PYPROJECT_PATH: Final[Path] = Path(PROJECT_PATH, "pyproject.toml")
+PYPROJECT_PATH: Final[Path] = Path(PROJECT_ROOT, "pyproject.toml")
 if not PYPROJECT_PATH.is_file():
-    raise FileNotFoundError(f"PYPROJECT file does not exist: {PYPROJECT_PATH}")
+    raise FileNotFoundError(f"{PYPROJECT_PATH=}")
 
 
 def open_toml(path: Path = TOML_PATH) -> Dict[str, Any]:
@@ -115,8 +115,10 @@ class SpotifyApiConfig(BaseSettings):
     client_secret: str
     redirect_uri: AnyUrl
     port: conint(gt=1024, lt=49151)  # type: ignore
-    scope: str
+    scope: List[str]
     timeout: conint(gt=1, lt=10)  # type: ignore
+    market: str
+    limit: conint(ge=1, le=50)  # type: ignore
 
     class Config:
         """Pydantic configuration subclass."""
@@ -141,6 +143,8 @@ def load_spotify_config(
         port=config["spotify"][environment]["port"],
         scope=config["spotify"][environment]["scope"],
         timeout=config["spotify"][environment]["timeout"],
+        market=config["spotify"][environment]["market"],
+        limit=config["spotify"][environment]["limit"],
     )
 
 

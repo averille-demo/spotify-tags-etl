@@ -6,14 +6,13 @@ import pendulum
 
 from media_etl.postgres_media import PostgresMedia
 from media_etl.sql import params_queries
-from media_etl.util.logger import init_logger
 
 MODULE = Path(__file__).resolve().name
 
 
 def trigger_etl():
     """Driver to generate database record(s) from source JSON."""
-    print(f"{MODULE} started: {pendulum.now(tz='America/Los_Angeles').to_datetime_string()}")
+    print(f"{MODULE} started: {pendulum.now(tz='America/Los_Angeles').to_atom_string()}")
     start = time.perf_counter()
     with PostgresMedia() as pgm:
         if pgm.connect():
@@ -33,5 +32,4 @@ def trigger_etl():
 
 
 if __name__ == "__main__":
-    log = init_logger(__file__)
     trigger_etl()

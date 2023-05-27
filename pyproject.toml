@@ -1,11 +1,14 @@
 [tool.poetry]
-name = "media_etl"
+name = "rdb_spotify_tags_etl_py"
 version = "1.2.2"
 description = "DEMO: load music tags: ['mp3','.m4a','.flac','.wma'] from JSON to postgres backend"
 authors = ["Emile Averill <cloud.dev.apps@averille.com>"]
 readme = "README.md"
 license = "MIT"
 keywords = ["music", "tags", "spotify"]
+packages = [
+    { include = "media_etl", from = "src" },
+]
 
 [tool.poetry.dependencies]
 python = "^3.11.0"
@@ -16,6 +19,7 @@ psycopg2-binary = "*"
 pydantic = "*"
 rapidfuzz = "*"
 spotipy = "*"
+sqlfluff = "*"
 
 [tool.poetry.group.dev.dependencies]
 black = "*"
@@ -52,6 +56,7 @@ ignore_missing_imports = false
 no_implicit_optional = true
 pretty = true
 show_error_codes = true
+check_untyped_defs = true
 disable_error_code = [
     "import"
 ]
