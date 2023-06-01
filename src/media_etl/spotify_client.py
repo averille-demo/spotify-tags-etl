@@ -75,7 +75,14 @@ class SpotifyClient:
         return isinstance(self.client, Spotify)
 
     def save_response(self, filename: str, results: Dict) -> None:
-        """Save full API response for debugging and validation."""
+        """Save full API response for debugging and validation.
+
+        Args:
+            filename (str): output basename (without '.json' extension)
+            results (Dict): raw response payload saved to file
+                * readable formatted output
+                * not newline delimited
+        """
         if DEBUG:
             path = Path(API_PATH, f"{pendulum.now().to_date_string()}", f"{filename}.json")
             try:
@@ -89,8 +96,13 @@ class SpotifyClient:
             except (ValueError, json.JSONDecodeError):
                 self.log.exception(f"{type(results)} '{path.name}'")
 
-    def save_records(self, models: List[SQLModel]):
-        """Convert list of SQL models to newline delimited JSON."""
+    def save_records(self, models: List[SQLModel]) -> None:
+        """Convert list of SQLModels to newline delimited JSON text file.
+
+        Args:
+            models (List): export SQLModels as newline delimited JSON text file
+            (leverages pydantic json_encoders to format date, time, datetime strings)
+        """
         try:
             if isinstance(models, List) and len(models) > 0:
                 model = models[0]
@@ -108,7 +120,20 @@ class SpotifyClient:
         time.sleep(self._config.api_timeout)
 
     def find_closest_match(self, keyword: str, items: Dict) -> Tuple[str, float]:
-        """Use fuzzy pattern matching (case insensitive) to find closest match."""
+        """Use fuzzy pattern matching (case insensitive) to find closest match.
+
+        For example, track name:
+                'II. Allegro scherzando' from Beethoven Symphony No.8 in F Major (Op.93)
+            may have many permutations depending on performing orchestra, date of recording, is compilation, etc.
+
+        Args:
+            keyword (str): query parameter as search criteria (artist, album, or track name)
+                Value contained within MP3 tags (local files) may not match Spotify's naming convention
+            items (Dict): API response return values to search by artist/album/track 'name'
+
+        Returns:
+            Tuple: closest matching track_id (str) and confidence (float 0.0 < 1.0)
+        """
         matches = []
         results: Dict[str, Any] = {
             "keyword": keyword,
@@ -141,7 +166,14 @@ class SpotifyClient:
         return results["hit_id"], results["confidence"]
 
     def get_artist_id(self, artist_name: str) -> str:
-        """Spotify API to lookup artist id by keyword."""
+        """Query Spotify API to lookup artist_id by keyword.
+
+        Args:
+            artist_name (str): keyword of artist name as search criteria
+
+        Returns:
+            string: Spotify's unique identifier for artist (based on best fuzzy pattern match)
+        """
         if self.is_connected():
             params = {"artist": artist_name}
             query = urllib.parse.urlencode(params)
@@ -159,7 +191,15 @@ class SpotifyClient:
         return artist_id
 
     def get_album_id(self, artist_id: str, album_title: str) -> str:
-        """Spotify API to lookup album id by keyword."""
+        """Query Spotify API to lookup album_id by keywords.
+
+        Args:
+            artist_id (str): keyword of artist name as search criteria
+            album_title (str): keyword of album name as search criteria
+
+        Returns:
+            string: Spotify's unique identifier for album (based on fuzzy pattern matching with best confidence)
+        """
         if self.is_connected():
             results = self.client.artist_albums(artist_id=artist_id, limit=self._config.api_limit)
             self.save_response(filename="get_album_id", results=results)
@@ -173,9 +213,17 @@ class SpotifyClient:
         return album_id
 
     def get_track_id(self, artist_name: str, album_title: str, track_title: str) -> str:
-        """Spotify API to lookup track/song id by keywords.
+        """Spotify API to lookup track_id by keywords.
 
         https://developer.spotify.com/documentation/web-api/reference/#/operations/search
+
+        Args:
+            artist_name (str): keyword of artist name as search criteria
+            album_title (str): keyword of album name as search criteria
+            track_title (str): keyword of track/song name as search criteria
+
+        Returns:
+            string: Spotify's unique identifier for track (based on fuzzy pattern matching with best confidence)
         """
         if self.is_connected():
             params = {"artist": artist_name, "album": album_title, "track": track_title}
@@ -197,7 +245,15 @@ class SpotifyClient:
         return track_id
 
     def convert_duration(self, value: int) -> Optional[pendulum.Time]:
-        """Convert milliseconds (integer since Epoch) to '%H:%M:%S' 24-hour ISO format."""
+        """Convert milliseconds to time object.
+
+        Args:
+            value (int): integer track duration in milliseconds
+            (example: 200158ms = 3 minutes, 20 seconds (or '00:03:20')
+
+        Returns:
+            pendulum.Time: UTC timezone aware time object later converted to '%H:%M:%S' 24-hour ISO format
+        """
         parsed = None
         try:
             dt = pendulum.from_format(string=str(value), fmt="x", tz="UTC")
@@ -207,7 +263,16 @@ class SpotifyClient:
         return parsed
 
     def convert_release_date(self, string: str) -> Optional[pendulum.Date]:
-        """Convert text to date object in 'YYYY-MM-DD' or 'YYYY' format."""
+        """Convert text to date object.
+
+        Args:
+            string (str): text with date when track was release by artist
+            valid input formats: 'YYYY-MM-DD', 'YYYY-MM', or 'YYYY'
+
+        Returns:
+            pendulum.Date: UTC timezone aware date object
+            if month or day is not provided in input, defaults to January 1st.
+        """
         parsed = None
         n_chars = len(string)
         try:
@@ -228,7 +293,14 @@ class SpotifyClient:
         return parsed
 
     def convert_added_at(self, string: str) -> Optional[pendulum.DateTime]:
-        """Convert text in 'YYYY-MM-DDTHH:MM:SSZ' format to datetime object."""
+        """Convert text in 'YYYY-MM-DDTHH:MM:SSZ' format to datetime object.
+
+        Args:
+            string (str): raw text with timestamp of when track was added to playlist
+
+        Returns:
+            pendulum.DateTime: UTC timezone aware datetime object
+        """
         parsed = None
         try:
             string = f"{string.replace('T', ' ').replace('Z', '')}"
@@ -243,6 +315,12 @@ class SpotifyClient:
         scope = "user-library-read"
         https://developer.spotify.com/documentation/web-api/reference/get-users-saved-tracks
         https://developer.spotify.com/documentation/web-api/concepts/track-relinking
+
+        Args:
+            item (Dict): nested API response for track item
+
+        Returns:
+            SpotifyFavoriteModel: custom formatted SQLModel object
         """
         model = None
         try:
@@ -274,10 +352,19 @@ class SpotifyClient:
         self,
         track_ids: List[str],
     ) -> List[Dict[str, Any]]:
-        """Get audio track features, limited to 50 IDs per reqeust.
+        """Get audio track features.
 
         https://developer.spotify.com/documentation/web-api/reference/get-audio-features
         https://spotipy.readthedocs.io/en/2.22.1/?highlight=audio_features#spotipy.client.Spotify.audio_features
+
+        Args:
+            track_ids (List): spotify track ids, either from:
+                priority: item["track"]["linked_from"]["id"])
+                or if 'linked_from' does not exist: track['id']
+            if track_ids > 50, API requests are batched in groups of 50
+
+        Returns:
+            SpotifyFavoriteModel: custom formatted SQLModel object
         """
         models: List[Dict[str, Any]] = []
         if isinstance(track_ids, List) and len(track_ids) > 0:
@@ -300,48 +387,67 @@ class SpotifyClient:
         self.save_records(models=models)
         return models
 
-    def add_liked_song(self, model: SpotifyFavoriteModel):
+    def add_liked_song(self, model: SpotifyFavoriteModel) -> None:
         """Add track to current user's 'Liked Songs' playlist.
 
         scope: user-library-modify
         https://developer.spotify.com/documentation/web-api/reference/save-tracks-user
         https://spotipy.readthedocs.io/en/2.22.1/#spotipy.client.Spotify.current_user_saved_tracks_add
+
+        Args:
+            model (SpotifyFavoriteModel): track information to add to 'Liked Songs'
         """
         try:
-            self.log.info(f"adding track to 'Like Songs' playlist: {model.json()}")
+            self.log.info(f"adding track to 'Like Songs' playlist: {model.to_string()}")
+            # pass track URI to endpoint
             self.client.current_user_saved_tracks_add(tracks=[f"spotify:{model.type}:{model.track_id}"])
         except SpotifyException:
             self.log.exception(f"delete {model.to_string()}")
 
-    def remove_liked_song(self, model: SpotifyFavoriteModel):
-        """Remove duplicates from current user's 'Liked Songs' playlist.
+    def remove_liked_song(self, model: SpotifyFavoriteModel) -> None:
+        """Remove track from current user's 'Liked Songs' playlist.
 
-        Spotify allows users to save duplicate tracks to 'Liked Songs' playlist.
-        If linked_from is present, use linked_from.uri as pointer for object to remove, else track.uri.
         scope: user-library-modify
         https://developer.spotify.com/documentation/web-api/reference/remove-tracks-user
         https://spotipy.readthedocs.io/en/2.22.1/#spotipy.client.Spotify.current_user_saved_tracks_delete
+
+        Args:
+            model (SpotifyFavoriteModel): track information to remove from 'Liked Songs'
+            If linked_from is present, use linked_from.track.uri as pointer for object to remove, else track.uri.
         """
         try:
-            self.log.info(f"removing track from 'Like Songs' playlist: {model.json()}")
+            self.log.info(f"removing track from 'Like Songs' playlist: {model.to_string()}")
+            # pass track URI to endpoint
             self.client.current_user_saved_tracks_delete(tracks=[f"spotify:{model.type}:{model.track_id}"])
         except SpotifyException:
             self.log.exception(f"delete {model.to_string()}")
 
-    def extract_favorite_tracks(self) -> List[str]:
-        """Get favorite tracks (liked songs in library).
+    def extract_favorite_tracks(self, item_limit: Optional[int] = None) -> List[str]:
+        """Get track information from current user's 'Liked Songs' playlist.
 
         scope = "user-library-read"
         https://developer.spotify.com/documentation/web-api/reference/get-users-saved-tracks
         https://spotipy.readthedocs.io/en/2.22.1/#spotipy.client.Spotify.current_user_saved_tracks_delete
+
+        Args:
+            item_limit (int): subset of all liked songs
+
+        Returns:
+            List: of track_ids as strings
+                if 'linked_from' is present:
+                    track_id = item["track"]["linked_from"]["id"])
+                else:
+                    track_id = item["track"]["id"]
         """
         models = []
         track_ids = []
-        # alternative to pagination, issue single request to find total number of favorites
+        # alternative to pagination, issue single request to find total number of tracks
         results = self.client.current_user_saved_tracks(limit=1, offset=0, market=self._config.market)
         total_tracks = results["total"]
-        # total_tracks = 100  # for debugging
         print(f"playlist: 'Liked Songs' contains ({total_tracks}) tracks")
+        if isinstance(item_limit, int) and item_limit < total_tracks:
+            print(f"extracting subset: {item_limit} of {total_tracks} available tracks")
+            total_tracks = item_limit
         for offset in tqdm(iterable=range(0, total_tracks, self._config.api_limit)):
             try:
                 results = self.client.current_user_saved_tracks(

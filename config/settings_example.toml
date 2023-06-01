@@ -7,8 +7,8 @@
 # postgres port: 5432 (default), 5454 (custom)
 [postgres.dev]
   endpoint = "localhost"
-  username = ""
-  password = ""
+  username = "some_user"
+  password = "some_password"
   database = "media_db"
   port = 5454
   timeout = 5
@@ -19,7 +19,14 @@
   client_secret = "abcdefg123456789"    # <-- enter your CLIENT_SECRET
   redirect_uri = "http://localhost"
   port = 9000
-  scope=["user-library-read", "user-library-modify", "user-read-recently-played"]
+  scope=[
+    "user-library-read",
+    "user-library-modify",
+    "user-read-recently-played",
+    "playlist-read-private",
+  ]
   market = "US"
-  api_timeout = 1.0
+  # prevent hitting quota limits
+  api_timeout = 0.5
+  # maximum number of items returned in response for spotify is 50
   api_limit = 50

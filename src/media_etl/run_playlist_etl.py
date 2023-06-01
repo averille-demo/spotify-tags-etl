@@ -26,9 +26,14 @@ def load_json_to_postgres(
     path: Path,
     base: SQLModel,
 ):
-    """Load data from JSON to Postgres.
+    """Load data from newline delimited JSON text file to Postgres.
 
     https://sqlmodel.tiangolo.com/tutorial/insert/
+
+    Args:
+        engine (Engine): sqlalchemy engine object
+        path (Path): source data file containing newline delimited JSON (each row represents one model instance)
+        base (SQLModel): model loaded to backend
     """
     if path.is_file():
         print(f"loading: {path.name=}")
@@ -59,7 +64,6 @@ def load_object_relational_models():
     print(f"{MODULE} started: {pendulum.now(tz='America/Los_Angeles').to_atom_string()}")
     start = time.perf_counter()
     try:
-        engine = init_database()
         conn = engine.connect()
         print(f"{conn=} {conn.get_isolation_level()}")
         if isinstance(conn, Connection):
@@ -74,11 +78,12 @@ def load_object_relational_models():
                 base=SpotifyAudioFeatureModel,
             )
             conn.close()
-        engine.dispose()
     except OperationalError:
         log.exception("postgres")
     print(f"{MODULE} finished ({time.perf_counter() - start:0.2f} seconds)")
 
 
 if __name__ == "__main__":
+    engine = init_database()
     load_object_relational_models()
+    engine.dispose()
