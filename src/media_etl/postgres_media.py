@@ -183,11 +183,12 @@ class PostgresMedia:
             cursor.execute(tbl_query, [self._config.database, table_schema])
             tables = cursor.fetchall()
             for table_name in ["".join(t) for t in tables]:
-                table_map[table_name] = []
-                cursor.execute(col_query, [table_schema, table_name])
-                columns = cursor.fetchall()
-                table_map[table_name].extend(["".join(c) for c in columns])
-                table_map[table_name].remove("id")
+                if table_name not in ["audio_feature", "liked_song"]:
+                    table_map[table_name] = []
+                    cursor.execute(col_query, [table_schema, table_name])
+                    columns = cursor.fetchall()
+                    table_map[table_name].extend(["".join(c) for c in columns])
+                    table_map[table_name].remove("id")
         return table_map
 
     def load_df(self, df: pd.DataFrame, truncate: bool = False) -> bool:

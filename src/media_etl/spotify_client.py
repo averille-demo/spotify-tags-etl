@@ -1,6 +1,7 @@
 """Spotify API client to lookup music tag data.
 
 https://github.com/spotipy-dev/spotipy-examples/blob/main/showcases.ipynb
+https://developer.spotify.com/documentation/web-api/concepts/track-relinking
 """
 import json
 import time
@@ -15,12 +16,15 @@ from rapidfuzz import fuzz
 from spotipy import Spotify
 from spotipy.exceptions import SpotifyException
 from spotipy.oauth2 import SpotifyOAuth, SpotifyOauthError
+from sqlmodel import SQLModel
+from tqdm import tqdm
 
+from media_etl.sql.models import SpotifyAudioFeatureModel, SpotifyFavoriteModel
 from media_etl.sql.offline_ids import OFFLINE_ALBUM_IDS, OFFLINE_ARTIST_IDS, OFFLINE_TRACK_IDS
-from media_etl.util.data_models import SpotifyAudioFeatureModel, SpotifyFavoriteModel
-from media_etl.util.logger import init_logger
+from media_etl.util.logger import get_relative_path, init_logger
 from media_etl.util.settings import (
     API_PATH,
+    DATA_PATH,
     DEBUG,
     PROJECT_ROOT,
     SpotifyApiConfig,
@@ -50,7 +54,7 @@ class SpotifyClient:
                     client_id=self._config.client_id,
                     client_secret=self._config.client_secret,
                     redirect_uri=f"{self._config.redirect_uri}:{self._config.port}",
-                    requests_timeout=self._config.timeout,
+                    requests_timeout=2,
                     scope=",".join(self._config.scope),
                     cache_path=Path(PROJECT_ROOT, "config", ".cache"),
                 )
@@ -73,17 +77,35 @@ class SpotifyClient:
     def save_response(self, filename: str, results: Dict) -> None:
         """Save full API response for debugging and validation."""
         if DEBUG:
+            path = Path(API_PATH, f"{pendulum.now().to_date_string()}", f"{filename}.json")
             try:
                 if isinstance(results, (Dict, List)):
-                    path = Path(API_PATH, f"{filename}.json")
+                    if not path.parent.is_dir():
+                        path.parent.mkdir(parents=True, exist_ok=True)
                     path.write_text(
                         data=json.dumps(results, indent=2, sort_keys=False, ensure_ascii=False, default=str),
                         encoding="utf-8",
                     )
-                else:
-                    self.log.error(f"invalid type: {type(results)}")
             except (ValueError, json.JSONDecodeError):
                 self.log.exception(f"{type(results)} '{path.name}'")
+
+    def save_records(self, models: List[SQLModel]):
+        """Convert list of SQL models to newline delimited JSON."""
+        try:
+            if isinstance(models, List) and len(models) > 0:
+                model = models[0]
+                path = Path(DATA_PATH, f"{model.__tablename__}_records.json")
+                # create newline delimited JSON
+                with open(file=path, mode="w", encoding="utf-8") as fp:
+                    for model in models:
+                        fp.write(f"{model.json()}\n")
+                print(f"saved: {get_relative_path(path)}'\t ({path.stat().st_size} bytes)")
+        except (ValueError, json.JSONDecodeError):
+            self.log.exception(f"{model.to_string()} '{path.name}'")
+
+    def pause(self):
+        """Don't bombard API endpoint(s) with requests."""
+        time.sleep(self._config.api_timeout)
 
     def find_closest_match(self, keyword: str, items: Dict) -> Tuple[str, float]:
         """Use fuzzy pattern matching (case insensitive) to find closest match."""
@@ -123,8 +145,11 @@ class SpotifyClient:
         if self.is_connected():
             params = {"artist": artist_name}
             query = urllib.parse.urlencode(params)
-            results = self.client.search(q=query, type="artist", market=self._config.market, limit=20)
+            results = self.client.search(
+                q=query, type="artist", market=self._config.market, limit=self._config.api_limit
+            )
             self.save_response(filename="get_artist_id", results=results)
+            self.pause()
             items = results["artists"].get("items", [])
             artist_id, confidence = self.find_closest_match(keyword=artist_name, items=items)
             self.log.info(f"artist: {artist_name} (id: {artist_id}) {confidence:0.2f}%")
@@ -136,8 +161,9 @@ class SpotifyClient:
     def get_album_id(self, artist_id: str, album_title: str) -> str:
         """Spotify API to lookup album id by keyword."""
         if self.is_connected():
-            results = self.client.artist_albums(artist_id=artist_id, limit=self._config.limit)
+            results = self.client.artist_albums(artist_id=artist_id, limit=self._config.api_limit)
             self.save_response(filename="get_album_id", results=results)
+            self.pause()
             items = results.get("items", [])
             album_id, confidence = self.find_closest_match(keyword=album_title, items=items)
             self.log.info(f"album: {album_title} (id: {album_id}) {confidence:0.2f}%")
@@ -154,8 +180,14 @@ class SpotifyClient:
         if self.is_connected():
             params = {"artist": artist_name, "album": album_title, "track": track_title}
             query = urllib.parse.urlencode(params)
-            results = self.client.search(q=query, type="track", market=self._config.market, limit=self._config.limit)
+            results = self.client.search(
+                q=query,
+                type="track",
+                market=self._config.market,
+                limit=self._config.api_limit,
+            )
             self.save_response(filename="get_track_id", results=results)
+            self.pause()
             items = results["tracks"].get("items", [])
             track_id, confidence = self.find_closest_match(keyword=track_title, items=items)
             self.log.info(f"track: {track_title} (id: {track_id}) {confidence:0.2f}%")
@@ -164,112 +196,175 @@ class SpotifyClient:
             self.log.error(f"offline {artist_name} {track_title} (id: {track_id})")
         return track_id
 
+    def convert_duration(self, value: int) -> Optional[pendulum.Time]:
+        """Convert milliseconds (integer since Epoch) to '%H:%M:%S' 24-hour ISO format."""
+        parsed = None
+        try:
+            dt = pendulum.from_format(string=str(value), fmt="x", tz="UTC")
+            parsed = pendulum.time(hour=dt.hour, minute=dt.minute, second=dt.second)
+        except (ValueError, ParserError):
+            self.log.exception(f"{value=}")
+        return parsed
+
+    def convert_release_date(self, string: str) -> Optional[pendulum.Date]:
+        """Convert text to date object in 'YYYY-MM-DD' or 'YYYY' format."""
+        parsed = None
+        n_chars = len(string)
+        try:
+            match n_chars:
+                # handle 'YYYY' format
+                case 4:
+                    parsed = pendulum.date(year=int(string), month=1, day=1)
+                # handle 'YYYY-MM' format
+                case 7:
+                    year, month = string.split("-")
+                    parsed = pendulum.date(year=int(year), month=int(month), day=1)
+                # expected format
+                case 10:
+                    dt = pendulum.from_format(string=string, fmt="YYYY-MM-DD", tz="UTC")
+                    parsed = pendulum.date(year=dt.year, month=dt.month, day=dt.day)
+        except (ValueError, ParserError):
+            self.log.exception(f"{string=}")
+        return parsed
+
+    def convert_added_at(self, string: str) -> Optional[pendulum.DateTime]:
+        """Convert text in 'YYYY-MM-DDTHH:MM:SSZ' format to datetime object."""
+        parsed = None
+        try:
+            string = f"{string.replace('T', ' ').replace('Z', '')}"
+            parsed = pendulum.from_format(string=string, fmt="YYYY-MM-DD HH:mm:ss", tz="UTC")
+        except (ValueError, ParserError):
+            self.log.exception(f"{string=}")
+        return parsed
+
     def parse_favorite(self, item: Dict[str, Any]) -> Optional[SpotifyFavoriteModel]:
-        """Extract desired user 'liked' track data from API response.
+        """Extract desired user liked song track data from nested API response.
 
         scope = "user-library-read"
         https://developer.spotify.com/documentation/web-api/reference/get-users-saved-tracks
+        https://developer.spotify.com/documentation/web-api/concepts/track-relinking
         """
         model = None
         try:
-            # convert milliseconds (since Epoch) to '%H:%M:%S.%f' 24-hour iso format
-            dt = pendulum.from_format(
-                string=str(item["track"]["duration_ms"]),
-                fmt="x",
-                tz="UTC",
-            )
+            # See important note: removing track from playlist, operate on original track id found in linked_from object
+            # https://developer.spotify.com/documentation/web-api/concepts/track-relinking
+            if item["track"].get("linked_from"):
+                track_id = item["track"]["linked_from"]["id"]
+            else:
+                track_id = item["track"]["id"]
             model = SpotifyFavoriteModel(
-                id=item["track"]["id"],
-                artist=item["track"]["album"]["artists"][0]["name"],
-                album=item["track"]["album"]["name"],
-                track=item["track"]["name"],
+                type=item["track"]["type"],
+                track_id=track_id,
+                artist_name=item["track"]["album"]["artists"][0]["name"],
+                album_name=item["track"]["album"]["name"],
+                track_name=item["track"]["name"],
                 track_number=item["track"]["track_number"],
-                duration=pendulum.time(
-                    hour=dt.hour,
-                    minute=dt.minute,
-                    second=dt.second,
-                    microsecond=dt.microsecond,
-                ),
-                release_date=pendulum.parse(text=item["track"]["album"]["release_date"]),
+                duration=self.convert_duration(value=item["track"]["duration_ms"]),
+                release_date=self.convert_release_date(string=item["track"]["album"]["release_date"]),
                 popularity=item["track"]["popularity"],
-                date_added=pendulum.parse(text=item["added_at"]),
-                url=item["track"]["external_urls"]["spotify"],
+                added_at=self.convert_added_at(string=item["added_at"]),
+                external_url=item["track"]["external_urls"]["spotify"],
+                extract_date=pendulum.now(tz="UTC"),
             )
-        except (KeyError, ValidationError, ParserError) as ex:
-            self.log.exception(ex)
+        except (KeyError, ValidationError, ParserError):
+            self.log.exception(f"{item['track']['id']}")
         return model
 
     def get_audio_features(
         self,
         track_ids: List[str],
-    ) -> Dict[str, SpotifyAudioFeatureModel]:
-        """Get audio track features."""
-        features: Dict[str, SpotifyAudioFeatureModel] = {}
-        if isinstance(track_ids, List) and len(track_ids) > 0:
-            results = self.client.audio_features(tracks=track_ids)
-            self.save_response(filename="audio_features", results=results)
-            for track in results:
-                track_id = track["id"]
-                # remove unwanted fields
-                for key in ["id", "type", "track_href", "uri"]:
-                    if key in track.keys():
-                        del track[key]
-                try:
-                    # pass all kwargs to schema
-                    features[track_id] = SpotifyAudioFeatureModel(**track)
-                except ValidationError:
-                    self.log.exception("audio_features")
-        return features
+    ) -> List[Dict[str, Any]]:
+        """Get audio track features, limited to 50 IDs per reqeust.
 
-    def extract_favorite_tracks(self) -> Dict[str, Any]:
+        https://developer.spotify.com/documentation/web-api/reference/get-audio-features
+        https://spotipy.readthedocs.io/en/2.22.1/?highlight=audio_features#spotipy.client.Spotify.audio_features
+        """
+        models: List[Dict[str, Any]] = []
+        if isinstance(track_ids, List) and len(track_ids) > 0:
+            # partition track_ids into batches based on API limits
+            for offset in tqdm(iterable=range(0, len(track_ids), self._config.api_limit), ascii=True):
+                batch = track_ids[offset: offset + self._config.api_limit]  # fmt: skip
+                results = self.client.audio_features(tracks=batch)
+                self.pause()
+                for item in results:
+                    try:
+                        # cast integers to strings for key and mode attributes (later converted to Major/minor, etc.)
+                        item["key"] = str(item["key"])
+                        item["mode"] = str(item["mode"])
+                        # pass all kwargs to schema, in this case, all Spotify API keys match pydantic model
+                        model = SpotifyAudioFeatureModel(**item)
+                        model.extract_date = pendulum.now(tz="UTC")
+                        models.append(model)
+                    except ValidationError:
+                        self.log.exception(f"{item=}")
+        self.save_records(models=models)
+        return models
+
+    def add_liked_song(self, model: SpotifyFavoriteModel):
+        """Add track to current user's 'Liked Songs' playlist.
+
+        scope: user-library-modify
+        https://developer.spotify.com/documentation/web-api/reference/save-tracks-user
+        https://spotipy.readthedocs.io/en/2.22.1/#spotipy.client.Spotify.current_user_saved_tracks_add
+        """
+        try:
+            self.log.info(f"adding track to 'Like Songs' playlist: {model.json()}")
+            self.client.current_user_saved_tracks_add(tracks=[f"spotify:{model.type}:{model.track_id}"])
+        except SpotifyException:
+            self.log.exception(f"delete {model.to_string()}")
+
+    def remove_liked_song(self, model: SpotifyFavoriteModel):
+        """Remove duplicates from current user's 'Liked Songs' playlist.
+
+        Spotify allows users to save duplicate tracks to 'Liked Songs' playlist.
+        If linked_from is present, use linked_from.uri as pointer for object to remove, else track.uri.
+        scope: user-library-modify
+        https://developer.spotify.com/documentation/web-api/reference/remove-tracks-user
+        https://spotipy.readthedocs.io/en/2.22.1/#spotipy.client.Spotify.current_user_saved_tracks_delete
+        """
+        try:
+            self.log.info(f"removing track from 'Like Songs' playlist: {model.json()}")
+            self.client.current_user_saved_tracks_delete(tracks=[f"spotify:{model.type}:{model.track_id}"])
+        except SpotifyException:
+            self.log.exception(f"delete {model.to_string()}")
+
+    def extract_favorite_tracks(self) -> List[str]:
         """Get favorite tracks (liked songs in library).
 
         scope = "user-library-read"
         https://developer.spotify.com/documentation/web-api/reference/get-users-saved-tracks
-        https://github.com/spotipy-dev/spotipy-examples/blob/main/showcases.ipynb
+        https://spotipy.readthedocs.io/en/2.22.1/#spotipy.client.Spotify.current_user_saved_tracks_delete
         """
-        data = {
-            "extract_date": pendulum.now(tz="America/Los_Angeles").to_iso8601_string(),
-            "total": 0,
-            "records": [],
-        }
-        offset = 0
-        page = 0
-        more_pages = True
-        try:
-            while more_pages:
-                page += 1
+        models = []
+        track_ids = []
+        # alternative to pagination, issue single request to find total number of favorites
+        results = self.client.current_user_saved_tracks(limit=1, offset=0, market=self._config.market)
+        total_tracks = results["total"]
+        # total_tracks = 100  # for debugging
+        print(f"playlist: 'Liked Songs' contains ({total_tracks}) tracks")
+        for offset in tqdm(iterable=range(0, total_tracks, self._config.api_limit)):
+            try:
                 results = self.client.current_user_saved_tracks(
-                    limit=self._config.limit,
+                    limit=self._config.api_limit,
                     offset=offset,
                     market=self._config.market,
                 )
-                self.save_response(filename="favorite_tracks", results=results)
-                time.sleep(1)
-                print(f"{page=:02d}\t {offset=:03d}")
-                # update loop counters
-                offset += self._config.limit
-                if not results["next"]:
-                    more_pages = False
+                self.pause()
                 items = results.get("items", [])
-                track_ids = [item["track"]["id"] for item in items]
-                features: Dict[str, SpotifyAudioFeatureModel] = self.get_audio_features(track_ids)
                 for item in items:
-                    track = self.parse_favorite(item=item)
-                    if isinstance(track, SpotifyFavoriteModel):
-                        row = track.dict()
-                        if track.id in features:
-                            row.update(features[track.id].dict())
-                        data["records"].append(row)
-            data["total"] = results["total"]
-            if len(data["records"]) != data["total"]:
-                self.log.error(f"count mismatch: {len(data['records'])} records != expected: {data['total']}")
-            self.save_response(filename="favorite_tracks_records", results=data)
-        except SpotifyException:
-            self.log.exception("favorite_tracks")
-        return data
+                    model = self.parse_favorite(item=item)
+                    if isinstance(model, SpotifyFavoriteModel):
+                        if model.track_id not in track_ids:
+                            track_ids.append(model.track_id)
+                        models.append(model)
+            except SpotifyException:
+                self.log.exception("favorite_tracks")
+        if len(track_ids) != len(models):
+            self.log.error(f"counts do not match: {len(track_ids)} != {len(models)} models")
+        self.save_records(models=models)
+        return track_ids
 
 
 if __name__ == "__main__":
     client = SpotifyClient(use_offline=False)
-    client.extract_favorite_tracks()
+    client.get_audio_features(track_ids=client.extract_favorite_tracks())

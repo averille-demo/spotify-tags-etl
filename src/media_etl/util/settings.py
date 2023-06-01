@@ -7,7 +7,7 @@ import tomllib
 from pathlib import Path
 from typing import Any, Dict, Final, List, Optional
 
-from pydantic import AnyUrl, BaseSettings, conint, validator
+from pydantic import AnyUrl, BaseSettings, confloat, conint, validator
 
 DEBUG: Final[bool] = True
 VALID_DB_ENV = frozenset(("dev", "prod"))
@@ -15,7 +15,10 @@ VALID_DB_ENV = frozenset(("dev", "prod"))
 SRC_PATH: Final[Path] = Path(__file__).resolve().parent.parent
 PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parent.parent.parent.parent
 
-DATA_PATH: Final[Path] = Path(PROJECT_ROOT, "data", "input")
+DATA_PATH: Final[Path] = Path(
+    PROJECT_ROOT,
+    "data",
+)
 if not DATA_PATH.is_dir():
     raise NotADirectoryError(f"{DATA_PATH=}")
 
@@ -59,8 +62,8 @@ class DatabaseConfig(BaseSettings):
     username: str
     password: str
     database: str
-    port: conint(gt=1024, lt=49151)  # type: ignore
-    timeout: conint(gt=1, lt=10)  # type: ignore
+    port: conint(gt=1024, lt=49151)  # type: ignore [valid-type]
+    timeout: conint(gt=1, lt=10)  # type: ignore [valid-type]
 
     class Config:
         """Pydantic configuration subclass."""
@@ -90,7 +93,6 @@ def load_db_config(
         PostgresConfig: pydantic settings object
     """
     config = open_toml()
-    print(config)
     return DatabaseConfig(
         name=config["project"]["name"],
         timezone=config["project"]["timezone"],
@@ -114,11 +116,11 @@ class SpotifyApiConfig(BaseSettings):
     client_id: str
     client_secret: str
     redirect_uri: AnyUrl
-    port: conint(gt=1024, lt=49151)  # type: ignore
+    port: conint(gt=1024, lt=49151)  # type: ignore [valid-type]
     scope: List[str]
-    timeout: conint(gt=1, lt=10)  # type: ignore
     market: str
-    limit: conint(ge=1, le=50)  # type: ignore
+    api_timeout: confloat(gt=0.0, lt=5.0)  # type: ignore [valid-type]
+    api_limit: conint(ge=1, le=50)  # type: ignore [valid-type]
 
     class Config:
         """Pydantic configuration subclass."""
@@ -142,9 +144,9 @@ def load_spotify_config(
         redirect_uri=config["spotify"][environment]["redirect_uri"],
         port=config["spotify"][environment]["port"],
         scope=config["spotify"][environment]["scope"],
-        timeout=config["spotify"][environment]["timeout"],
         market=config["spotify"][environment]["market"],
-        limit=config["spotify"][environment]["limit"],
+        api_timeout=config["spotify"][environment]["api_timeout"],
+        api_limit=config["spotify"][environment]["api_limit"],
     )
 
 

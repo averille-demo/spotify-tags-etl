@@ -19,5 +19,7 @@
   client_secret = "abcdefg123456789"    # <-- enter your CLIENT_SECRET
   redirect_uri = "http://localhost"
   port = 9000
-  scope="user-library-read"
-  timeout = 5
+  scope=["user-library-read", "user-library-modify", "user-read-recently-played"]
+  market = "US"
+  api_timeout = 1.0
+  api_limit = 50

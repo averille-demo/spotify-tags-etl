@@ -8,6 +8,7 @@ desktop.ini
 **/api/
 *.bak*
 *_temp*
+*_records.json
 *.lock
 *.log
 
