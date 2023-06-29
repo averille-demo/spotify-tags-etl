@@ -28,6 +28,7 @@ def load_json_to_postgres(
 ):
     """Load data from newline delimited JSON text file to Postgres.
 
+    The benefit of this approach is database loads can be performed 'offline' (without hitting Spotify APIs).
     https://sqlmodel.tiangolo.com/tutorial/insert/
 
     Args:

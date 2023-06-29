@@ -242,7 +242,9 @@ class PostgresMedia:
         """Performs non-recursive search for JSON files by extension in directory."""
         paths = []
         if DATA_PATH.is_dir():
-            paths = [p.absolute() for p in sorted(DATA_PATH.glob("*.json")) if p.is_file() and p.stat().st_size > 0]
+            paths = [
+                p.absolute() for p in sorted(DATA_PATH.glob("*extract.json")) if p.is_file() and p.stat().st_size > 0
+            ]
         return paths
 
     def load_data(self) -> bool:

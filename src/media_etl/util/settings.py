@@ -15,10 +15,7 @@ VALID_DB_ENV = frozenset(("dev", "prod"))
 SRC_PATH: Final[Path] = Path(__file__).resolve().parent.parent
 PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parent.parent.parent.parent
 
-DATA_PATH: Final[Path] = Path(
-    PROJECT_ROOT,
-    "data",
-)
+DATA_PATH: Final[Path] = Path(PROJECT_ROOT, "data")
 if not DATA_PATH.is_dir():
     raise NotADirectoryError(f"{DATA_PATH=}")
 
@@ -45,7 +42,7 @@ def open_toml(path: Path = TOML_PATH) -> Dict[str, Any]:
         with open(file=path, mode="rb") as fp:
             return tomllib.load(fp)
     else:
-        raise FileNotFoundError(f"TOML file not found: {path}")
+        raise FileNotFoundError(f"{path=}")
 
 
 # pylint: disable=[missing-function-docstring,too-few-public-methods,missing-class-docstring]
