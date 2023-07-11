@@ -8,21 +8,19 @@ import time
 from pathlib import Path
 
 import pendulum
+from spotify_client import SpotifyClient
 from sql.models import SpotifyAudioFeatureModel, SpotifyFavoriteModel, init_database
 from sqlalchemy.engine.base import Connection, Engine
 from sqlalchemy.exc import NoReferencedColumnError, OperationalError, ProgrammingError
 from sqlmodel import Session, SQLModel
 from util.logger import init_logger
 
-from media_etl.util.settings import DATA_PATH, DatabaseConfig, load_db_config
+from media_etl.util.settings import DATA_PATH
 
 MODULE = Path(__file__).resolve().name
-config: DatabaseConfig = load_db_config()
-log = init_logger(__file__)
 
 
 def load_json_to_postgres(
-    engine: Engine,
     path: Path,
     base: SQLModel,
 ):
@@ -32,7 +30,6 @@ def load_json_to_postgres(
     https://sqlmodel.tiangolo.com/tutorial/insert/
 
     Args:
-        engine (Engine): sqlalchemy engine object
         path (Path): source data file containing newline delimited JSON (each row represents one model instance)
         base (SQLModel): model loaded to backend
     """
@@ -69,12 +66,10 @@ def load_object_relational_models():
         print(f"{conn=} {conn.get_isolation_level()}")
         if isinstance(conn, Connection):
             load_json_to_postgres(
-                engine=engine,
                 path=Path(DATA_PATH, "liked_song_records.json"),
                 base=SpotifyFavoriteModel,
             )
             load_json_to_postgres(
-                engine=engine,
                 path=Path(DATA_PATH, "audio_feature_records.json"),
                 base=SpotifyAudioFeatureModel,
             )
@@ -84,7 +79,23 @@ def load_object_relational_models():
     print(f"{MODULE} finished ({time.perf_counter() - start:0.2f} seconds)")
 
 
-if __name__ == "__main__":
-    engine = init_database()
+def trigger_etl():
+    """Driver to generate database record(s) from source JSON."""
+    print(f"{MODULE} started: {pendulum.now(tz='America/Los_Angeles').to_datetime_string()}")
+    start = time.perf_counter()
+
+    client = SpotifyClient()
+    # extract latest values from 'Liked Songs' playlist, save as JSON
+    track_ids = client.extract_favorite_tracks()
+    # for each track, query spotify metrics, save as JSON
+    client.query_audio_features(track_ids)
+
     load_object_relational_models()
     engine.dispose()
+    print(f"{MODULE} finished ({time.perf_counter() - start:0.2f} seconds)")
+
+
+if __name__ == "__main__":
+    log = init_logger(__file__)
+    engine: Engine = init_database()
+    trigger_etl()

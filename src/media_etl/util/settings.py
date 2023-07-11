@@ -9,11 +9,14 @@ from typing import Any, Dict, Final, List, Optional
 
 from pydantic import AnyUrl, BaseSettings, confloat, conint, validator
 
-DEBUG: Final[bool] = True
+ENABLE_API: Final[bool] = True
+DEBUG: Final[bool] = False
+
 VALID_DB_ENV = frozenset(("dev", "prod"))
 
 SRC_PATH: Final[Path] = Path(__file__).resolve().parent.parent
 PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parent.parent.parent.parent
+REPO_NAME: Final[str] = PROJECT_ROOT.stem.replace(" ", "_").replace("-", "_")
 
 DATA_PATH: Final[Path] = Path(PROJECT_ROOT, "data")
 if not DATA_PATH.is_dir():

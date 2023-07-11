@@ -17,6 +17,7 @@ VALID_TYPES = ["track", "artist", "album", "playlist", "show", "episode", "audio
 class SpotifyFavoriteModel(SQLModel, table=True):  # type: ignore [call-arg]
     """Data model for Spotify 'Liked Song including subset of fields."""
 
+    __table_args__ = {"extend_existing": True}
     __tablename__ = "liked_song"
     track_id: str = Field(default=None, primary_key=True)
     type: str
@@ -30,10 +31,10 @@ class SpotifyFavoriteModel(SQLModel, table=True):  # type: ignore [call-arg]
     popularity: conint(ge=0, le=100)  # type: ignore [valid-type]
     added_at: Optional[DateTime]
     external_url: HttpUrl
-    extract_date: DateTime
-    load_date: DateTime
+    extract_date: Optional[DateTime]
+    load_date: Optional[DateTime]
 
-    def to_string(self):
+    def to_string(self) -> str:
         """Helper abbreviated string representation."""
         return f"{self.artist_name=} {self.track_number=} {self.track_name=} {self.track_id=}"
 
@@ -43,7 +44,6 @@ class SpotifyFavoriteModel(SQLModel, table=True):  # type: ignore [call-arg]
         https://docs.pydantic.dev/usage/model_config/#options
         """
 
-        allow_mutation = True
         check_fields = True
         allow_population_by_field_name = False
         anystr_strip_whitespace = True
@@ -102,6 +102,7 @@ class SpotifyAudioFeatureModel(SQLModel, table=True):  # type: ignore [call-arg]
     https://developer.spotify.com/documentation/web-api/reference/get-several-audio-features
     """
 
+    __table_args__ = {"extend_existing": True}
     __tablename__ = "audio_feature"
     type: str
     id: str = Field(default=None, primary_key=True)
@@ -134,10 +135,10 @@ class SpotifyAudioFeatureModel(SQLModel, table=True):  # type: ignore [call-arg]
     valence: condecimal(ge=0.0, le=1.0, decimal_places=6) = Field(default=0.0)  # type: ignore [valid-type]
     track_href: str
     analysis_url: str
-    extract_date: DateTime
-    load_date: DateTime
+    extract_date: Optional[DateTime]
+    load_date: Optional[DateTime]
 
-    def to_string(self):
+    def to_string(self) -> str:
         """Helper abbreviated string representation."""
         return f"track_id: {self.id} {self.key} {self.mode} ({self.tempo} bpm)"
 
@@ -147,7 +148,6 @@ class SpotifyAudioFeatureModel(SQLModel, table=True):  # type: ignore [call-arg]
         https://docs.pydantic.dev/usage/model_config/#options
         """
 
-        allow_mutation = True
         check_fields = True
         allow_population_by_field_name = False
         orm_mode = True

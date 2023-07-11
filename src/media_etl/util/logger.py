@@ -2,18 +2,29 @@
 import logging
 import sys
 from pathlib import Path
-from types import TracebackType
-from typing import Final
 
-PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parent.parent.parent.parent
-REPO_NAME = PROJECT_ROOT.stem
+from media_etl.util.settings import PROJECT_ROOT, REPO_NAME
 
 
-def get_relative_path(
+def get_readable_size(path: Path) -> str:
+    """Convert bytes to readable string."""
+    if path.exists():
+        size = float(path.stat().st_size)
+    else:
+        size = 0.0
+    for unit in ["", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"]:
+        if abs(size) < 1024.0:
+            return f"({size:03.2f} {unit}B)"
+        size /= 1024.0
+    return f"({size:03.2f} YiB)"
+
+
+def relative_size(
     path: Path,
 ) -> str:
-    """Truncate path to last n-parts of project level."""
-    return path.as_posix().replace(PROJECT_ROOT.as_posix(), "")
+    """Logging helper, truncate path relative to project level, add readable file size."""
+    relative_path = path.as_posix().replace(PROJECT_ROOT.as_posix(), "")
+    return f"{relative_path} {get_readable_size(path)}"
 
 
 class SingleLineFormatter(logging.Formatter):
@@ -34,21 +45,18 @@ class SingleLineFormatter(logging.Formatter):
         Returns:
             str: message and exception debugging information to single line
         """
-        message = []
         # if no exception, ensure message is single line output
         if record.msg:
             record.msg = " ".join(str(record.msg).split())
         # if exception, ensure single line output with exception details
         if record.exc_info:
-            message.append(f"{record.msg} | " if record.msg else "")
             ex_type, ex_value, ex_tb = sys.exc_info()
-            if isinstance(ex_type, BaseException):
-                message.append(f"{ex_type} ")
-            if isinstance(ex_value, BaseException):
-                message.append(" ".join(str(ex_value).split()))
-            if isinstance(ex_tb, TracebackType):
-                message.append(f" ({Path(ex_tb.tb_frame.f_code.co_filename).name} line:{ex_tb.tb_lineno})")
-            record.msg = "".join(message)
+            ex_msg = []
+            ex_msg.append(f"{record.msg} | " if record.msg else "")
+            ex_msg.append(f"{ex_type} ")
+            ex_msg.append(" ".join(str(ex_value).split()))
+            # overwrite prior message with original plus exception information
+            record.msg = "".join(ex_msg)
             # reset logger for next exception
             record.exc_info = None
             record.exc_text = None
@@ -56,7 +64,7 @@ class SingleLineFormatter(logging.Formatter):
 
 
 def init_logger(
-    log_name: str,
+    caller: str,
 ) -> logging.Logger:
     """Generate custom Logger object writes output to both file and standard output.
 
@@ -64,25 +72,24 @@ def init_logger(
     https://docs.python.org/3/library/logging.html#logging-levels
 
     Args:
-        log_name (str): __file__ of calling module passed to getLogger()
+        caller (str): __file__ of calling module passed to getLogger()
 
     Returns:
         logging.Logger: instance based on name and file location
     """
     # create log directory and empty file (if needed)
     log_file = Path(PROJECT_ROOT, "logs", f"{REPO_NAME}.log")
-    # create log directory and empty file (if needed)
     if not log_file.parent.exists():
         log_file.parent.mkdir(parents=True, exist_ok=True)
     if not log_file.is_file():
         log_file.touch(mode=0o777, exist_ok=True)
 
     # when passing __file__, set to caller basename
-    logger = logging.getLogger(name=Path(log_name).name)
+    logger = logging.getLogger(name=Path(caller).name)
     logger.setLevel(level=logging.INFO)
 
     # update custom log format
-    log_format = SingleLineFormatter(
+    log_format = logging.Formatter(
         fmt="{asctime} [{levelname}] {name} | {funcName}() line:{lineno} | {message}",
         datefmt="%Y-%m-%d %H:%M:%S",
         style="{",

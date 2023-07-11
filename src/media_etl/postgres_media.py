@@ -13,7 +13,7 @@ from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT, connection
 from psycopg2.extras import NamedTupleCursor
 
 from media_etl.spotify_client import SpotifyClient
-from media_etl.util.logger import get_relative_path, init_logger
+from media_etl.util.logger import init_logger, relative_size
 from media_etl.util.settings import DATA_PATH, SQL_PATH, DatabaseConfig, load_db_config, parse_pyproject
 
 pd.set_option("display.max_rows", 128)
@@ -34,9 +34,8 @@ class PostgresMedia:
 
     def __init__(self):
         """Initialize class."""
-        self.spotify_client: SpotifyClient = SpotifyClient(use_offline=False)
+        self.spotify_client: SpotifyClient = SpotifyClient()
         self._config: DatabaseConfig = load_db_config()
-        self.is_loaded: bool = False
         self.db_conn: connection = None
 
     def connect(self) -> bool:
@@ -204,7 +203,7 @@ class PostgresMedia:
                         artist_name=series["artist_name"],
                     )
                     series["album_id"] = self.spotify_client.get_album_id(
-                        artist_id=series["artist_id"],
+                        artist_name=series["artist_name"],
                         album_title=series["album_title"],
                     )
                     series["track_id"] = self.spotify_client.get_track_id(
@@ -240,31 +239,24 @@ class PostgresMedia:
     @staticmethod
     def get_source_data() -> List[Path]:
         """Performs non-recursive search for JSON files by extension in directory."""
-        paths = []
+        files = []
         if DATA_PATH.is_dir():
-            paths = [
-                p.absolute() for p in sorted(DATA_PATH.glob("*extract.json")) if p.is_file() and p.stat().st_size > 0
+            files = [
+                p.absolute() for p in sorted(DATA_PATH.glob("*local*.json")) if p.is_file() and p.stat().st_size > 0
             ]
-        return paths
+        return files
 
-    def load_data(self) -> bool:
+    def load_data(self) -> None:
         """Loads JSON file(s) from source data folder."""
-        processed_ok = {}
-        try:
-            self.log.info(f"processing: {get_relative_path(DATA_PATH)}")
-            for path in self.get_source_data():
+        for path in self.get_source_data():
+            self.log.info(f"processing: {relative_size(path)}")
+            try:
                 df = pd.read_json(path, orient="records", lines=True, encoding="utf-8")
                 df["extract_date"] = pendulum.now(tz="UTC").to_iso8601_string()
-                processed_ok[path.as_posix()] = self.load_df(df=df)
-            if processed_ok:
-                # if all executed successfully, return True
-                if next((p for p in list(processed_ok.values())), True):
-                    self.is_loaded = True
-                else:
-                    self.log.error(f"{get_relative_path(DATA_PATH)} {processed_ok}")
-        except (OSError, PermissionError, KeyError):
-            self.log.exception(f"{get_relative_path(DATA_PATH)}")
-        return self.is_loaded
+                if not self.load_df(df=df):
+                    self.log.error(f"failed to load: {relative_size(path)}")
+            except (KeyError, ValueError):
+                self.log.exception(f"{path.name}")
 
     def close(self):
         """Cleanup database connection."""
