@@ -19,7 +19,7 @@
   client_secret = "abcdefg123456789"    # <-- enter your CLIENT_SECRET
   redirect_uri = "http://localhost"
   port = 9000
-  scope=[
+  scopes = [
     "user-library-read",
     "user-library-modify",
     "user-read-recently-played",
@@ -30,3 +30,5 @@
   api_timeout = 0.5
   # maximum number of items returned in response for spotify is 50
   api_limit = 50
+  # confidence threshold
+  thold = 70.0

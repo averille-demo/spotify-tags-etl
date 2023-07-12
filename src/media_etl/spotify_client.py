@@ -4,6 +4,7 @@ https://github.com/spotipy-dev/spotipy-examples/blob/main/showcases.ipynb
 https://developer.spotify.com/documentation/web-api/concepts/track-relinking
 """
 import json
+import re
 import time
 import unicodedata
 from pathlib import Path
@@ -26,13 +27,15 @@ from media_etl.util.logger import init_logger, relative_size
 from media_etl.util.settings import (
     API_PATH,
     DATA_PATH,
-    DEBUG,
     ENABLE_API,
     PROJECT_ROOT,
     SpotifyApiConfig,
     load_spotify_config,
     parse_pyproject,
 )
+
+# compile once, use many times
+RE_SYMBOLS = re.compile("[" + re.escape("""!"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~""") + "]")
 
 
 class SpotifyClient:
@@ -57,7 +60,7 @@ class SpotifyClient:
                     client_secret=self._config.client_secret,
                     redirect_uri=f"{self._config.redirect_uri}:{self._config.port}",
                     requests_timeout=2,
-                    scope=",".join(self._config.scope),
+                    scope=self._config.scopes,
                     cache_path=Path(PROJECT_ROOT, "config", ".cache"),
                 )
                 self.client = Spotify(
@@ -85,18 +88,17 @@ class SpotifyClient:
                 * readable formatted output
                 * not newline delimited
         """
-        if DEBUG:
-            path = Path(API_PATH, f"{pendulum.now().to_date_string()}", f"{filename}.json")
-            try:
-                if isinstance(results, (Dict, List)):
-                    if not path.parent.is_dir():
-                        path.parent.mkdir(parents=True, exist_ok=True)
-                    path.write_text(
-                        data=json.dumps(results, indent=2, sort_keys=False, ensure_ascii=False, default=str),
-                        encoding="utf-8",
-                    )
-            except (ValueError, json.JSONDecodeError):
-                self.log.exception(f"{type(results)} '{path.name}'")
+        path = Path(API_PATH, f"{pendulum.now().to_date_string()}", f"{filename}.json")
+        try:
+            if isinstance(results, (Dict, List)):
+                if not path.parent.is_dir():
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(
+                    data=json.dumps(results, indent=2, sort_keys=False, ensure_ascii=False, default=str),
+                    encoding="utf-8",
+                )
+        except (ValueError, json.JSONDecodeError):
+            self.log.exception(f"{type(results)} '{path.name}'")
 
     def save_records(self, models: List[SQLModel]) -> None:
         """Convert list of SQLModels to newline delimited JSON text file.
@@ -139,47 +141,47 @@ class SpotifyClient:
         results: Dict[str, Any] = {
             "keyword": keyword,
             "dtype": dtype,
-            "hit_name": None,
-            "hit_id": None,
-            "confidence": 0.0,
+            "best": {"name": None, "id": None, "confidence": 0.0},
             "count": 0,
             "candidates": [],
         }
         for item in items:
             fuzz_ratio = round(fuzz.ratio(s1=keyword, s2=item["name"]), 4)
             matches.append(fuzz_ratio)
-            results["candidates"].append(
-                {
-                    "name": item["name"],
-                    "id": item.get("id"),
-                    "fuzz_ratio": fuzz_ratio,
-                }
-            )
+            results["candidates"].append({"name": item["name"], "id": item.get("id"), "fuzz_ratio": fuzz_ratio})
             # skip scanning once identical match is found
             if fuzz_ratio == 100.0:
                 break
         # get index to list element with highest similarity match
         if matches:
             max_idx = matches.index(max(matches))
-            results["hit_name"] = items[max_idx]["name"]
-            results["hit_id"] = items[max_idx]["id"]
-            results["confidence"] = results["candidates"][max_idx]["fuzz_ratio"]
+            results["best"]["name"] = items[max_idx]["name"]
+            results["best"]["id"] = items[max_idx]["id"]
+            results["best"]["confidence"] = results["candidates"][max_idx]["fuzz_ratio"]
         results["count"] = len(results["candidates"])
-        if results["confidence"] < 75.0:
+        if results["best"]["confidence"] < self._config.thold:
             self.save_response(filename=f"closest_match-{dtype}-{keyword}", results=results)
-        return results["hit_id"], results["confidence"]
+        return results["best"]["id"], results["best"]["confidence"]
 
     @staticmethod
-    def normalize(text: str) -> str:
-        """Convert non-english unicode characters to ASCII english alphabet.
+    def normalize(text: str, delimiter: str = " ") -> str:
+        """Sanitize symbols and convert non-english unicode characters to ASCII english alphabet.
 
-        The Spotify API is more precise if using non-unicode chars in search query
+        The Spotify API is more precise when removing symbols and unicode chars in search query
+
         Args:
             text (str): string to convert (example: 'Björk' to 'Bjork')
+            delimiter (str): single character used to replace symbols
 
         Returns:
             normalized string of ASCII characters
         """
+        # replace any invalid symbols with delimiter
+        text = re.sub(RE_SYMBOLS, delimiter, text)
+        # replace two or more whitespace with single
+        text = re.sub(r"\s{2,}", delimiter, text)
+        # remove starting/trailing whitespace
+        text = text.strip(delimiter)
         normalized = unicodedata.normalize("NFD", text)
         return "".join([c for c in normalized if not unicodedata.combining(c)])
 
@@ -197,6 +199,7 @@ class SpotifyClient:
         offset = 0
         page = 0
         more_pages = True
+
         # https://github.com/spotipy-dev/spotipy/blob/d31969108d462c544f41aba4581a0d84a1e75d6f/spotipy/client.py#L572
         if dtype not in ["artist", "album", "track", "playlist", "show", "episode"]:
             raise ValueError(dtype)
@@ -204,7 +207,6 @@ class SpotifyClient:
         while more_pages:
             page += 1
             try:
-                # print(f"{dtype=}\t {page=:02d}\t {offset=:03d}")
                 batch = self.client.search(
                     q=urlencode(query=params),
                     type=dtype,
@@ -215,7 +217,6 @@ class SpotifyClient:
                 # append 's' to make dtype plural
                 batch_items = batch[f"{dtype}s"].get("items", [])
                 if batch_items:
-                    # self.save_response(filename=f"{dtype}_{page=:02d}", results=batch)
                     items.extend(batch_items)
                     # update loop counters
                     offset += self._config.api_limit
@@ -224,9 +225,8 @@ class SpotifyClient:
                     more_pages = False
             except SpotifyException:
                 self.log.exception(f"{params=} {dtype=}")
-
         # once all items are extracted, return result set
-        self.save_response(filename=f"query_all_{dtype}s", results=items)
+        # self.save_response(filename=f"query_all_{dtype}s", results=items)
         return items
 
     def get_artist_id(self, artist_name: str) -> str:
@@ -244,7 +244,10 @@ class SpotifyClient:
             params = {"artist": self.normalize(artist_name)}
             items = self.query_all(params=params, dtype="artist")
             artist_id, confidence = self.find_closest_match(keyword=artist_name, dtype="artist", items=items)
-            self.log.info(f"{artist_name=} {artist_id=} {confidence=:0.2f}%")
+            if confidence > self._config.thold:
+                self.log.info(f"{artist_name=} {artist_id=} {confidence=:0.2f}%")
+            else:
+                self.log.error(f"{artist_name=} {artist_id=} {confidence=:0.2f}% {params=}")
         else:
             artist_id = OFFLINE_ARTIST_IDS.get(artist_name, "not_found")
             self.log.info(f"{artist_name=} {artist_id=} ({ENABLE_API=})")
@@ -266,7 +269,10 @@ class SpotifyClient:
             params = {"artist": self.normalize(artist_name)}
             items = self.query_all(params=params, dtype="album")
             album_id, confidence = self.find_closest_match(keyword=album_title, dtype="album", items=items)
-            self.log.info(f"{album_title=} {album_id=} {confidence=:0.2f}%")
+            if confidence > self._config.thold:
+                self.log.info(f"{album_title=} {album_id=} {confidence=:0.2f}%")
+            else:
+                self.log.error(f"{album_title=} {album_id=} {confidence=:0.2f}% {params=}")
         else:
             album_id = OFFLINE_ALBUM_IDS.get(album_title, "not_found")
             self.log.info(f"{album_title=} {album_id=} ({ENABLE_API=})")
@@ -293,7 +299,10 @@ class SpotifyClient:
             }
             items = self.query_all(params=params, dtype="track")
             track_id, confidence = self.find_closest_match(keyword=track_title, dtype="track", items=items)
-            self.log.info(f"{artist_name=} {track_title=} {track_id=} {confidence=:0.2f}%")
+            if confidence > self._config.thold:
+                self.log.info(f"{artist_name=} {track_title=} {track_id=} {confidence=:0.2f}%")
+            else:
+                self.log.error(f"{artist_name=} {track_title=} {track_id=} {confidence=:0.2f}% {params=}")
         else:
             track_id = OFFLINE_TRACK_IDS.get(track_title, "not_found")
             self.log.info(f"{artist_name=} {track_title=} {track_id=} ({ENABLE_API=})")
@@ -439,7 +448,7 @@ class SpotifyClient:
                         models.append(model)
                     except ValidationError:
                         self.log.exception(f"{feature=}")
-        self.save_records(models=models)
+            self.save_records(models=models)
         return models
 
     def add_liked_song(self, model: SpotifyFavoriteModel) -> None:
@@ -452,13 +461,13 @@ class SpotifyClient:
         Args:
             model (SpotifyFavoriteModel): track information to add to 'Liked Songs'
         """
-        try:
-            if self.is_connected():
+        if self.is_connected():
+            try:
                 self.log.info(f"adding track to 'Like Songs' playlist: {model.to_string()}")
                 # pass track URI to endpoint
                 self.client.current_user_saved_tracks_add(tracks=[f"spotify:{model.type}:{model.track_id}"])
-        except SpotifyException:
-            self.log.exception(f"delete {model.to_string()}")
+            except SpotifyException:
+                self.log.exception(f"delete {model.to_string()}")
 
     def remove_liked_song(self, model: SpotifyFavoriteModel) -> None:
         """Remove track from current user's 'Liked Songs' playlist.
@@ -471,13 +480,13 @@ class SpotifyClient:
             model (SpotifyFavoriteModel): track information to remove from 'Liked Songs'
             If linked_from is present, use linked_from.track.uri as pointer for object to remove, else track.uri.
         """
-        try:
-            if self.is_connected():
+        if self.is_connected():
+            try:
                 self.log.info(f"removing track from 'Like Songs' playlist: {model.to_string()}")
                 # pass track URI to endpoint
                 self.client.current_user_saved_tracks_delete(tracks=[f"spotify:{model.type}:{model.track_id}"])
-        except SpotifyException:
-            self.log.exception(f"delete {model.to_string()}")
+            except SpotifyException:
+                self.log.exception(f"delete {model.to_string()}")
 
     def extract_favorite_tracks(self, item_limit: Optional[int] = None) -> List[str]:
         """Get track information from current user's 'Liked Songs' playlist.

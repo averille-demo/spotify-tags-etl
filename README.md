@@ -125,6 +125,24 @@ poetry self update
 poetry update -vvv | tee ./logs/poetry_update.log
 ```
 
+## Observations
+While leveraging the Spotify APIs, I noticed a few quirks:
+* Search queries with [&,.] symbols returned incorrect 'id' matches:
+  * example:
+    * 'Sallie Ford & The Sound Outside' -> '6S7GGa2a501L3vN8h7yGhv' = INVALID
+    * 'Sallie Ford The Sound Outside' -> '0Z8RhQLJrLxKMWoUW2qo95' = **CORRECT**
+* Classical music queries are poorly supported in [Search for Item API](https://developer.spotify.com/documentation/web-api/reference/search):
+  * missing relevant search parameters: 'orchestra', 'date performed', 'conductor', etc.
+* Search queries with Unicode characters also returned incorrect 'id' matches:
+  * example:
+    * 'Björk' -> '0L2E40bnomT7iQiZvKYC0B' = INVALID
+    * 'Bjork' -> '6xy8s41CbAZbN6skLwoPYn' = **CORRECT**
+* While performing pagination, the "total" number of items available to return was also invalid:
+  * I ended up checking if items list had elements vs. continuing to query endpoint for empty items (last n-pages)
+* It would be better for API endpoints to support subqueries (GraphQL: only return specific fields in each response)
+  * Goal: ignore unnecessary portion of API response payload (images, available_markets, etc.)
+
+
 ## Resources
 * [Spotipy](https://spotipy.readthedocs.io)
 * [RapidFuzz](https://github.com/maxbachmann/rapidfuzz)

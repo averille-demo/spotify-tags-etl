@@ -36,7 +36,9 @@ class SpotifyFavoriteModel(SQLModel, table=True):  # type: ignore [call-arg]
 
     def to_string(self) -> str:
         """Helper abbreviated string representation."""
-        return f"{self.artist_name=} {self.track_number=} {self.track_name=} {self.track_id=}"
+        return (
+            f"artist: '{self.artist_name}' track: '{self.track_number:02d}-{self.track_name}' track_id: {self.track_id}"
+        )
 
     class Config:
         """Model configuration options.

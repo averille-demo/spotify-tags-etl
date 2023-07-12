@@ -33,6 +33,7 @@ def load_json_to_postgres(
         path (Path): source data file containing newline delimited JSON (each row represents one model instance)
         base (SQLModel): model loaded to backend
     """
+    start = time.perf_counter()
     if path.is_file():
         print(f"loading: {path.name=}")
         # read newline delimited JSON text data
@@ -55,12 +56,11 @@ def load_json_to_postgres(
                 except (ProgrammingError, NoReferencedColumnError):
                     log.exception(f"{record=}")
             session.close()
+    log.info(f"loaded {base.__name__} ({time.perf_counter() - start:0.2f} seconds)")
 
 
 def load_object_relational_models():
     """Driver to generate database record(s) from source JSON."""
-    print(f"{MODULE} started: {pendulum.now(tz='America/Los_Angeles').to_atom_string()}")
-    start = time.perf_counter()
     try:
         conn = engine.connect()
         print(f"{conn=} {conn.get_isolation_level()}")
@@ -76,7 +76,6 @@ def load_object_relational_models():
             conn.close()
     except OperationalError:
         log.exception("postgres")
-    print(f"{MODULE} finished ({time.perf_counter() - start:0.2f} seconds)")
 
 
 def trigger_etl():

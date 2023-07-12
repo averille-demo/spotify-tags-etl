@@ -117,16 +117,24 @@ class SpotifyApiConfig(BaseSettings):
     client_secret: str
     redirect_uri: AnyUrl
     port: conint(gt=1024, lt=49151)  # type: ignore [valid-type]
-    scope: List[str]
-    market: str
+    scopes: List[str] = ["user-library-read"]
+    market: str = "US"
     api_timeout: confloat(gt=0.0, lt=5.0)  # type: ignore [valid-type]
     api_limit: conint(ge=1, le=50)  # type: ignore [valid-type]
+    thold: confloat(gt=0.0, lt=100.0)  # type: ignore [valid-type]
 
     class Config:
         """Pydantic configuration subclass."""
 
         secrets_dir = TOML_PATH.parent.as_posix()
         case_sensitive = True
+
+    @validator("scopes")
+    def convert_list_to_comma_delimited_string(cls, elements: List) -> str:
+        """Create comma delimited string from list of values."""
+        if isinstance(elements, List):
+            return ",".join(elements)
+        return elements
 
 
 def load_spotify_config(
@@ -143,10 +151,11 @@ def load_spotify_config(
         client_secret=config["spotify"][environment]["client_secret"],
         redirect_uri=config["spotify"][environment]["redirect_uri"],
         port=config["spotify"][environment]["port"],
-        scope=config["spotify"][environment]["scope"],
+        scopes=config["spotify"][environment]["scopes"],
         market=config["spotify"][environment]["market"],
         api_timeout=config["spotify"][environment]["api_timeout"],
         api_limit=config["spotify"][environment]["api_limit"],
+        thold=config["spotify"][environment]["thold"],
     )
 
 
