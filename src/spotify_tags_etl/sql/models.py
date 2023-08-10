@@ -8,7 +8,7 @@ from pendulum import Date, DateTime, Time
 from pydantic import HttpUrl, condecimal, conint, validator
 from sqlmodel import Field, SQLModel, create_engine, inspect
 
-from media_etl.util.settings import DatabaseConfig, load_db_config
+from spotify_tags_etl.util.settings import DatabaseConfig, load_db_config
 
 VALID_TYPES = ["track", "artist", "album", "playlist", "show", "episode", "audio_features"]
 

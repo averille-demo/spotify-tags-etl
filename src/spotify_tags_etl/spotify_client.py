@@ -21,10 +21,10 @@ from spotipy.oauth2 import SpotifyOAuth, SpotifyOauthError
 from sqlmodel import SQLModel
 from tqdm import tqdm
 
-from media_etl.sql.models import SpotifyAudioFeatureModel, SpotifyFavoriteModel
-from media_etl.sql.offline_ids import OFFLINE_ALBUM_IDS, OFFLINE_ARTIST_IDS, OFFLINE_TRACK_IDS
-from media_etl.util.logger import init_logger, relative_size
-from media_etl.util.settings import (
+from spotify_tags_etl.sql.models import SpotifyAudioFeatureModel, SpotifyFavoriteModel
+from spotify_tags_etl.sql.offline_ids import OFFLINE_ALBUM_IDS, OFFLINE_ARTIST_IDS, OFFLINE_TRACK_IDS
+from spotify_tags_etl.util.logger import init_logger, relative_size
+from spotify_tags_etl.util.settings import (
     API_PATH,
     DATA_PATH,
     ENABLE_API,
@@ -34,8 +34,8 @@ from media_etl.util.settings import (
     parse_pyproject,
 )
 
-# compile once, use many times
-RE_SYMBOLS = re.compile("[" + re.escape("""!"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~""") + "]")
+# compile once, use many times: keep commas, periods, colons, and hyphens
+RE_SYMBOLS = re.compile("[" + re.escape("""!"#$%&'()*+/;<=>?@[\\]^_`{|}~""") + "]")
 
 
 class SpotifyClient:
@@ -199,14 +199,12 @@ class SpotifyClient:
         offset = 0
         page = 0
         more_pages = True
-
         # https://github.com/spotipy-dev/spotipy/blob/d31969108d462c544f41aba4581a0d84a1e75d6f/spotipy/client.py#L572
         if dtype not in ["artist", "album", "track", "playlist", "show", "episode"]:
             raise ValueError(dtype)
-
-        while more_pages:
-            page += 1
-            try:
+        try:
+            while more_pages:
+                page += 1
                 batch = self.client.search(
                     q=urlencode(query=params),
                     type=dtype,
@@ -214,7 +212,8 @@ class SpotifyClient:
                     limit=self._config.api_limit,
                     offset=offset,
                 )
-                # append 's' to make dtype plural
+                # self.save_response(filename=f"batch_{dtype}s_{page:02d}", results=batch)
+                # append 's' to make datatype plural
                 batch_items = batch[f"{dtype}s"].get("items", [])
                 if batch_items:
                     items.extend(batch_items)
@@ -223,10 +222,10 @@ class SpotifyClient:
                     self.pause()
                 else:
                     more_pages = False
-            except SpotifyException:
-                self.log.exception(f"{params=} {dtype=}")
+        except SpotifyException:
+            self.log.exception(f"{params=} {dtype=}")
         # once all items are extracted, return result set
-        # self.save_response(filename=f"query_all_{dtype}s", results=items)
+        self.save_response(filename=f"query_all_{dtype}s", results=items)
         return items
 
     def get_artist_id(self, artist_name: str) -> str:
@@ -253,7 +252,7 @@ class SpotifyClient:
             self.log.info(f"{artist_name=} {artist_id=} ({ENABLE_API=})")
         return artist_id
 
-    def get_album_id(self, artist_name: str, album_title: str) -> str:
+    def get_album_id(self, artist_name: str, album_title: str, year: str) -> str:
         """Query Spotify API to lookup album_id by keywords.
 
         https://github.com/spotipy-dev/spotipy/blob/d31969108d462c544f41aba4581a0d84a1e75d6f/spotipy/client.py#L404
@@ -266,7 +265,9 @@ class SpotifyClient:
             string: Spotify's unique identifier for album (based on fuzzy pattern matching with best confidence)
         """
         if self.is_connected():
-            params = {"artist": self.normalize(artist_name)}
+            params = {"artist": self.normalize(artist_name), "album": album_title}
+            if str(year).isdigit():
+                params["year"] = year
             items = self.query_all(params=params, dtype="album")
             album_id, confidence = self.find_closest_match(keyword=album_title, dtype="album", items=items)
             if confidence > self._config.thold:

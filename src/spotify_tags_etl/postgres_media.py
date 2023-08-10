@@ -11,10 +11,9 @@ import pendulum
 import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT, connection
 from psycopg2.extras import NamedTupleCursor
-
-from media_etl.spotify_client import SpotifyClient
-from media_etl.util.logger import init_logger, relative_size
-from media_etl.util.settings import DATA_PATH, SQL_PATH, DatabaseConfig, load_db_config, parse_pyproject
+from spotify_client import SpotifyClient
+from util.logger import init_logger, relative_size
+from util.settings import DATA_PATH, SQL_PATH, DatabaseConfig, load_db_config, parse_pyproject
 
 pd.set_option("display.max_rows", 128)
 pd.set_option("expand_frame_repr", False)
@@ -191,7 +190,13 @@ class PostgresMedia:
         return table_map
 
     def load_df(self, df: pd.DataFrame, truncate: bool = False) -> bool:
-        """Driver to parse JSON file and commit to Postgres database."""
+        """Driver to parse JSON file and commit to Postgres database.
+
+        https://developer.spotify.com/documentation/web-api/reference/search
+        artist and year filters can be used while searching albums, artists and tracks.
+        album filter can be used while searching albums and tracks.
+        genre filter can be used while searching artists and tracks.
+        """
         loaded_ok = {}
         if isinstance(df, pd.DataFrame):
             if truncate:
@@ -205,6 +210,7 @@ class PostgresMedia:
                     series["album_id"] = self.spotify_client.get_album_id(
                         artist_name=series["artist_name"],
                         album_title=series["album_title"],
+                        year=series["year"],
                     )
                     series["track_id"] = self.spotify_client.get_track_id(
                         artist_name=series["artist_name"],

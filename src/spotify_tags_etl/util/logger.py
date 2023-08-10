@@ -3,7 +3,7 @@ import logging
 import sys
 from pathlib import Path
 
-from media_etl.util.settings import PROJECT_ROOT, REPO_NAME
+from spotify_tags_etl.util.settings import PROJECT_ROOT, REPO_NAME
 
 
 def get_readable_size(path: Path) -> str:
@@ -89,7 +89,7 @@ def init_logger(
     logger.setLevel(level=logging.INFO)
 
     # update custom log format
-    log_format = logging.Formatter(
+    log_format = SingleLineFormatter(
         fmt="{asctime} [{levelname}] {name} | {funcName}() line:{lineno} | {message}",
         datefmt="%Y-%m-%d %H:%M:%S",
         style="{",

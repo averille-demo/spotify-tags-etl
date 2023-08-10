@@ -14,8 +14,7 @@ from sqlalchemy.engine.base import Connection, Engine
 from sqlalchemy.exc import NoReferencedColumnError, OperationalError, ProgrammingError
 from sqlmodel import Session, SQLModel
 from util.logger import init_logger
-
-from media_etl.util.settings import DATA_PATH
+from util.settings import DATA_PATH
 
 MODULE = Path(__file__).resolve().name
 

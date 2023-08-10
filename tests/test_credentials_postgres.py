@@ -1,7 +1,7 @@
 """Tests for parsing database credentials as pydantic settings."""
 import pytest
 
-from media_etl.util import settings
+from spotify_tags_etl.util import settings
 
 
 def test_load_postgres_settings():

@@ -3,9 +3,8 @@ import time
 from pathlib import Path
 
 import pendulum
-
-from media_etl.postgres_media import PostgresMedia
-from media_etl.sql import params_queries
+from postgres_media import PostgresMedia
+from sql import params_queries
 
 MODULE = Path(__file__).resolve().name
 

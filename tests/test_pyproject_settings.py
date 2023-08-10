@@ -5,7 +5,7 @@ from typing import Dict, List
 
 import pytest
 
-from media_etl.util import settings
+from spotify_tags_etl.util import settings
 
 VALID_TOML = settings.TOML_PATH
 INVALID_TOML = Path(settings.TOML_PATH.parent, "does_not_exist.toml")
