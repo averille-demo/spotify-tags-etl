@@ -3,6 +3,7 @@
 https://github.com/spotipy-dev/spotipy-examples/blob/main/showcases.ipynb
 https://developer.spotify.com/documentation/web-api/concepts/track-relinking
 """
+
 import json
 import re
 import time
@@ -27,7 +28,6 @@ from spotify_tags_etl.util.logger import init_logger, relative_size
 from spotify_tags_etl.util.settings import (
     API_PATH,
     DATA_PATH,
-    ENABLE_API,
     PROJECT_ROOT,
     SpotifyApiConfig,
     load_spotify_config,
@@ -36,6 +36,7 @@ from spotify_tags_etl.util.settings import (
 
 # compile once, use many times: keep commas, periods, colons, and hyphens
 RE_SYMBOLS = re.compile("[" + re.escape("""!"#$%&'()*+/;<=>?@[\\]^_`{|}~""") + "]")
+EXACT_MATCH = 100.0
 
 
 class SpotifyClient:
@@ -48,11 +49,11 @@ class SpotifyClient:
         """Start Spotify API client to query tag data."""
         self.client: Spotify = None
         self._config: SpotifyApiConfig = load_spotify_config(environment="dev")
-        if ENABLE_API:
-            self.connect()
+        self.connect()
 
     def connect(self) -> bool:
         """Setup and test if OAuth2 client is successfully connected."""
+        cache_path = Path(PROJECT_ROOT, "config", ".cache")
         try:
             if isinstance(self._config, SpotifyApiConfig):
                 auth_manager = SpotifyOAuth(
@@ -61,7 +62,7 @@ class SpotifyClient:
                     redirect_uri=f"{self._config.redirect_uri}:{self._config.port}",
                     requests_timeout=2,
                     scope=self._config.scopes,
-                    cache_path=Path(PROJECT_ROOT, "config", ".cache"),
+                    cache_path=cache_path,
                 )
                 self.client = Spotify(
                     auth_manager=auth_manager,
@@ -73,6 +74,10 @@ class SpotifyClient:
                     return True
         except (SpotifyOauthError, SpotifyException):
             self.log.exception("unable to connect, check settings")
+            # prevent SpotifyOauthError: invalid_grant, error_description: 'Refresh token revoked'
+            if cache_path.is_file():
+                # remove old ./config/.cache
+                cache_path.unlink(missing_ok=True)
         return False
 
     def is_connected(self) -> bool:
@@ -150,7 +155,7 @@ class SpotifyClient:
             matches.append(fuzz_ratio)
             results["candidates"].append({"name": item["name"], "id": item.get("id"), "fuzz_ratio": fuzz_ratio})
             # skip scanning once identical match is found
-            if fuzz_ratio == 100.0:
+            if fuzz_ratio == EXACT_MATCH:
                 break
         # get index to list element with highest similarity match
         if matches:
@@ -169,6 +174,7 @@ class SpotifyClient:
 
         The Spotify API is more precise when removing symbols and unicode chars in search query
 
+        https://docs.python.org/3/library/unicodedata.html
         Args:
             text (str): string to convert (example: 'Björk' to 'Bjork')
             delimiter (str): single character used to replace symbols
@@ -249,7 +255,7 @@ class SpotifyClient:
                 self.log.error(f"{artist_name=} {artist_id=} {confidence=:0.2f}% {params=}")
         else:
             artist_id = OFFLINE_ARTIST_IDS.get(artist_name, "not_found")
-            self.log.info(f"{artist_name=} {artist_id=} ({ENABLE_API=})")
+            self.log.info(f"{artist_name=} {artist_id=}")
         return artist_id
 
     def get_album_id(self, artist_name: str, album_title: str, year: str) -> str:
@@ -276,7 +282,7 @@ class SpotifyClient:
                 self.log.error(f"{album_title=} {album_id=} {confidence=:0.2f}% {params=}")
         else:
             album_id = OFFLINE_ALBUM_IDS.get(album_title, "not_found")
-            self.log.info(f"{album_title=} {album_id=} ({ENABLE_API=})")
+            self.log.info(f"{album_title=} {album_id=}")
         return album_id
 
     def get_track_id(self, artist_name: str, album_title: str, track_title: str) -> str:
@@ -306,7 +312,7 @@ class SpotifyClient:
                 self.log.error(f"{artist_name=} {track_title=} {track_id=} {confidence=:0.2f}% {params=}")
         else:
             track_id = OFFLINE_TRACK_IDS.get(track_title, "not_found")
-            self.log.info(f"{artist_name=} {track_title=} {track_id=} ({ENABLE_API=})")
+            self.log.info(f"{artist_name=} {track_title=} {track_id=}")
         return track_id
 
     def convert_duration(self, value: int) -> Optional[pendulum.Time]:
@@ -407,7 +413,6 @@ class SpotifyClient:
                 popularity=item["track"]["popularity"],
                 added_at=self.convert_added_at(string=item["added_at"]),
                 external_url=item["track"]["external_urls"]["spotify"],
-                extract_date=pendulum.now(tz="UTC"),
             )
         except (KeyError, ValidationError, ParserError):
             self.log.exception(f"{item['track']['id']}")
@@ -416,7 +421,7 @@ class SpotifyClient:
     def query_audio_features(
         self,
         track_ids: List[str],
-    ) -> List[Dict[str, Any]]:
+    ) -> List[SQLModel]:
         """Get audio track features.
 
         https://developer.spotify.com/documentation/web-api/reference/get-audio-features
@@ -431,7 +436,7 @@ class SpotifyClient:
         Returns:
             SpotifyFavoriteModel: custom formatted SQLModel object
         """
-        models: List = []
+        models: List[SQLModel] = []
         if self.is_connected() and isinstance(track_ids, List) and len(track_ids) > 0:
             # partition track_ids into batches based on API limits
             for offset in tqdm(iterable=range(0, len(track_ids), self._config.api_limit), ascii=True):
@@ -445,7 +450,6 @@ class SpotifyClient:
                         feature["mode"] = str(feature["mode"])
                         # pass all kwargs to schema, in this case, all Spotify API keys match pydantic model
                         model = SpotifyAudioFeatureModel(**feature)
-                        model.extract_date = pendulum.now(tz="UTC")
                         models.append(model)
                     except ValidationError:
                         self.log.exception(f"{feature=}")
@@ -506,7 +510,7 @@ class SpotifyClient:
                 else:
                     track_id = item["track"]["id"]
         """
-        models = []
+        models: List[SQLModel] = []
         track_ids = []
         if self.is_connected():
             # alternative to pagination, issue single request to find total number of tracks

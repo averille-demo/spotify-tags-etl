@@ -1,6 +1,6 @@
 # *Music Library* ETL - Relational
 
-[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-311/)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-312/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Code style: isort](https://img.shields.io/badge/%20imports-isort-%231674b1)](https://pycqa.github.io/isort/)
@@ -23,6 +23,8 @@ The purpose of **_this_** project is to use several data management tools to lev
    * export [SQLModels](./src/spotify_tags_etl/sql/models.py) as newline delimited JSON files (custom formatted rows)
    * load results to two new 'liked_song' and 'audio_feature' tables in Postgres
 
+**updated: 2024-01-31** to include pydantic v2 models
+
 ## Data source (offline)
 ![image](./img/local_media_extract.png)
 
@@ -44,8 +46,8 @@ within './config/*_secret.toml':
 # update: './docker/config/*_secret.env':
 cp './docker/config/postgres_example_dev.env' './docker/config/postgres_private_dev.env'
 
-POSTGRES_PASSWORD  # <-- enter your credentials
-POSTGRES_PASSWORD
+POSTGRES_USER      # <-- enter your username
+POSTGRES_PASSWORD  # <-- enter your password (no special chars)
 PGADMIN_DEFAULT_EMAIL
 PGADMIN_DEFAULT_PASSWORD
 ```
@@ -57,9 +59,9 @@ PGADMIN_DEFAULT_PASSWORD
 poetry --version
 
 # use latest python version for venv
-pyenv install --list | grep " 3.11"
-pyenv install 3.11.0
-pyenv local 3.11.0
+pyenv install --list | grep " 3.12"
+pyenv install 3.12.0
+pyenv local 3.12.0
 
 # optional: update poetry settings
 poetry config virtualenvs.in-project true
@@ -95,16 +97,22 @@ poetry run pre-commit install --install-hooks
 ```
 ![image](./img/docker_desktop.png)
 
-### Step 4: Trigger MP3 Tag ETL
+### Step 4: Trigger Media Tag ETL
 ```
-# load local JSON file to Postgres
-poetry run python ./src/media_etl/run_pipeline.py
+# load local JSON file to postgres
+poetry run python ./src/spotify_tags_etl/run_pipeline.py
+
+# optional: query spotify for matching album, artist, track IDs:
+poetry run python ./src/spotify_tags_etl/run_pipeline.py --query-spotify
 ```
 
 ### Step 5: Run playlist ETL script
 ```
-# query Spotify 'Liked Songs' playlist and load to Postgres using SQLModel ORM libray
-poetry run python ./src/media_etl/run_playlist_etl.py
+# to only load JSON files (prior query to postgres using SQLModel ORM library:
+poetry run python ./src/spotify_tags_etl/run_playlist_etl.py
+
+# optional: query Spotify 'Liked Songs' and audio feature extraction, and load to postgres:
+poetry run python ./src/spotify_tags_etl/run_playlist_etl.py --query-spotify
 ```
 
 ![image](./img/tqdm_status.png)

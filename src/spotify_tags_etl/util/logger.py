@@ -1,6 +1,8 @@
 """Single line logger module."""
+
 import logging
 import sys
+from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
 from spotify_tags_etl.util.settings import PROJECT_ROOT, REPO_NAME
@@ -8,15 +10,14 @@ from spotify_tags_etl.util.settings import PROJECT_ROOT, REPO_NAME
 
 def get_readable_size(path: Path) -> str:
     """Convert bytes to readable string."""
-    if path.exists():
-        size = float(path.stat().st_size)
-    else:
-        size = 0.0
-    for unit in ["", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"]:
-        if abs(size) < 1024.0:
-            return f"({size:03.2f} {unit}B)"
-        size /= 1024.0
-    return f"({size:03.2f} YiB)"
+    block_size = 1000.0
+    if path.is_file():
+        file_size = float(path.stat().st_size)
+        for unit in ["B", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"]:
+            if abs(file_size) < block_size:
+                return f"({file_size:03.2f} {unit})"
+            file_size /= block_size
+    return ""
 
 
 def relative_size(
@@ -96,15 +97,20 @@ def init_logger(
         validate=True,
     )
 
+    def namer(name):
+        """Move .log file extension to end after YYYY-MM-DD."""
+        return name.replace(".log", "") + ".log"
+
     # save messages to log file
-    file_handler = logging.FileHandler(filename=log_file)
-    file_handler.setLevel(level=logging.DEBUG)
-    file_handler.setFormatter(fmt=log_format)
-    logger.addHandler(hdlr=file_handler)
+    fh = TimedRotatingFileHandler(filename=log_file, when="midnight", backupCount=5, encoding="utf8")
+    fh.setLevel(level=logging.DEBUG)
+    fh.setFormatter(fmt=log_format)
+    fh.namer = namer
+    logger.addHandler(hdlr=fh)
 
     # display messages to console
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(level=logging.INFO)
-    console_handler.setFormatter(fmt=log_format)
-    logger.addHandler(hdlr=console_handler)
+    sh = logging.StreamHandler(sys.stdout)
+    sh.setLevel(level=logging.INFO)
+    sh.setFormatter(fmt=log_format)
+    logger.addHandler(hdlr=sh)
     return logger

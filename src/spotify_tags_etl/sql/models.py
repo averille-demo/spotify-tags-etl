@@ -1,69 +1,69 @@
 """SQLModel module which combines pydantic and sqlalchemy functionality.
 
+updated: 2024-01-31
 https://sqlmodel.tiangolo.com/
 """
+
 from typing import Optional
 
-from pendulum import Date, DateTime, Time
-from pydantic import HttpUrl, condecimal, conint, validator
+import pendulum
+from pydantic import ConfigDict, condecimal, conint, field_validator
 from sqlmodel import Field, SQLModel, create_engine, inspect
 
 from spotify_tags_etl.util.settings import DatabaseConfig, load_db_config
 
-VALID_TYPES = ["track", "artist", "album", "playlist", "show", "episode", "audio_features"]
+DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+VALID_TYPES = [
+    "track",
+    "artist",
+    "album",
+    "playlist",
+    "show",
+    "episode",
+    "audio_features",
+]
 
 
 # pylint: disable=[too-few-public-methods, no-self-argument]
 class SpotifyFavoriteModel(SQLModel, table=True):  # type: ignore [call-arg]
-    """Data model for Spotify 'Liked Song including subset of fields."""
+    """Data model for Spotify 'Liked Songs' playlist including subset of fields."""
 
     __table_args__ = {"extend_existing": True}
     __tablename__ = "liked_song"
+
+    model_config = ConfigDict(
+        populate_by_name=False,
+        str_strip_whitespace=True,
+        from_attributes=True,
+    )
+
     track_id: str = Field(default=None, primary_key=True)
     type: str
     artist_name: str
     album_name: str
     track_name: str
     track_number: conint(ge=0)  # type: ignore [valid-type]
-    duration: Optional[Time]
-    release_date: Optional[Date]
+    duration: str
+    release_date: str
     # https://www.loudlab.org/blog/spotify-popularity-leverage-algorithm/
     popularity: conint(ge=0, le=100)  # type: ignore [valid-type]
-    added_at: Optional[DateTime]
-    external_url: HttpUrl
-    extract_date: Optional[DateTime]
-    load_date: Optional[DateTime]
+    added_at: str
+    external_url: str
+    # timestamp data was pulled from spotify
+    extract_date: str = pendulum.now(tz="UTC").to_datetime_string()
+    # timestamp JSON was loaded to postgres
+    load_date: Optional[str]
 
     def to_string(self) -> str:
         """Helper abbreviated string representation."""
         return (
-            f"artist: '{self.artist_name}' track: '{self.track_number:02d}-{self.track_name}' track_id: {self.track_id}"
+            f"artist: '{self.artist_name}' "
+            f"track: '{self.track_number:02d}-{self.track_name}' "
+            f"track_id: {self.track_id}"
         )
 
-    class Config:
-        """Model configuration options.
-
-        https://docs.pydantic.dev/usage/model_config/#options
-        """
-
-        check_fields = True
-        allow_population_by_field_name = False
-        anystr_strip_whitespace = True
-        json_encoders = {
-            Date: lambda d: d.to_date_string(),
-            Time: lambda t: t.strftime("%H:%M:%S"),
-            DateTime: lambda dt: dt.to_datetime_string(),
-        }
-        orm_mode = True
-
-    @validator("added_at", "extract_date", "load_date")
-    def update_datetime_format(cls, v):
-        """Update datetime object to 'YYYY-MM-DD HH:MM:SS' string format."""
-        if isinstance(v, DateTime):
-            return v.to_datetime_string()
-        return v
-
-    @validator("type")
+    @field_validator("type", mode="before")
     def check_type(cls, v):
         """Validate type: https://www.iana.org/assignments/uri-schemes/prov/spotify."""
         if v not in VALID_TYPES:
@@ -106,6 +106,13 @@ class SpotifyAudioFeatureModel(SQLModel, table=True):  # type: ignore [call-arg]
 
     __table_args__ = {"extend_existing": True}
     __tablename__ = "audio_feature"
+
+    model_config = ConfigDict(
+        populate_by_name=False,
+        str_strip_whitespace=True,
+        from_attributes=True,
+    )
+
     type: str
     id: str = Field(default=None, primary_key=True)
     uri: str
@@ -137,45 +144,30 @@ class SpotifyAudioFeatureModel(SQLModel, table=True):  # type: ignore [call-arg]
     valence: condecimal(ge=0.0, le=1.0, decimal_places=6) = Field(default=0.0)  # type: ignore [valid-type]
     track_href: str
     analysis_url: str
-    extract_date: Optional[DateTime]
-    load_date: Optional[DateTime]
+    # timestamp data was pulled from spotify
+    extract_date: str = pendulum.now(tz="UTC").to_datetime_string()
+    # timestamp JSON was loaded to postgres
+    load_date: Optional[str]
 
     def to_string(self) -> str:
         """Helper abbreviated string representation."""
         return f"track_id: {self.id} {self.key} {self.mode} ({self.tempo} bpm)"
 
-    class Config:
-        """Model configuration options.
-
-        https://docs.pydantic.dev/usage/model_config/#options
-        """
-
-        check_fields = True
-        allow_population_by_field_name = False
-        orm_mode = True
-
-    @validator("key")
+    @field_validator("key", mode="before")
     def replace_pitch_class(cls, v: str):
         """Replace integer value with musical key."""
         if v.isdigit():
             return PITCH_CLASSES.get(v)
         return v
 
-    @validator("mode")
+    @field_validator("mode", mode="before")
     def replace_mode(cls, v: str):
         """Replace integer value with Major/minor."""
         if v.isdigit():
             return MUSICAL_MODES.get(v)
         return v
 
-    @validator("extract_date", "load_date")
-    def update_datetime_format(cls, v):
-        """Update datetime object to 'YYYY-MM-DD HH:MM:SS' string format."""
-        if isinstance(v, DateTime):
-            return v.to_datetime_string()
-        return v
-
-    @validator("type")
+    @field_validator("type", mode="before")
     def check_type(cls, v):
         """Validate type: https://www.iana.org/assignments/uri-schemes/prov/spotify."""
         if v not in VALID_TYPES:
@@ -198,6 +190,7 @@ def show_tables(engine, include_columns: bool = False):
 def init_database(verbose: bool = False):
     """Initialize engine and recreate database and tables."""
     config: DatabaseConfig = load_db_config()
+    # avoid special characters in password
     url = f"postgresql://{config.username}:{config.password}@{config.endpoint}:{config.port}/{config.database}"
     engine = create_engine(url=url, echo=verbose)
     SQLModel.metadata.drop_all(engine)

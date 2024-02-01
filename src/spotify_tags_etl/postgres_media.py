@@ -2,6 +2,7 @@
 
 https://www.psycopg.org/docs/index.html
 """
+
 from pathlib import Path
 from pprint import pprint
 from typing import Dict, List, Tuple
@@ -31,9 +32,12 @@ class PostgresMedia:
         """Dunder methods enter/exit needed for with() context."""
         return self
 
-    def __init__(self):
+    def __init__(self, query_spotify: bool):
         """Initialize class."""
-        self.spotify_client: SpotifyClient = SpotifyClient()
+        if query_spotify:
+            self.spotify_client: SpotifyClient = SpotifyClient()
+        else:
+            self.spotify_client = None
         self._config: DatabaseConfig = load_db_config()
         self.db_conn: connection = None
 
@@ -230,8 +234,8 @@ class PostgresMedia:
                                 f"INSERT INTO {table} ({', '.join(columns)}) "
                                 f"VALUES ({', '.join(['%s'] * len(columns))})"
                             )
-                            # select ordered subset of columns from series
-                            cursor.execute(query=query, vars=series[columns])
+                            # select ordered subset of column values from series
+                            cursor.execute(query=query, vars=series[columns].values)
                             if cursor.rowcount == 1:
                                 loaded_ok[track_tag] = True
                             else:
@@ -258,6 +262,7 @@ class PostgresMedia:
             self.log.info(f"processing: {relative_size(path)}")
             try:
                 df = pd.read_json(path, orient="records", lines=True, encoding="utf-8")
+                # timestamp when local '.json' files were read
                 df["extract_date"] = pendulum.now(tz="UTC").to_iso8601_string()
                 if not self.load_df(df=df):
                     self.log.error(f"failed to load: {relative_size(path)}")
