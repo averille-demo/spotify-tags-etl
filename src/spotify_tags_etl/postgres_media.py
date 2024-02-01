@@ -32,9 +32,12 @@ class PostgresMedia:
         """Dunder methods enter/exit needed for with() context."""
         return self
 
-    def __init__(self):
+    def __init__(self, query_spotify: bool):
         """Initialize class."""
-        self.spotify_client: SpotifyClient = SpotifyClient()
+        if query_spotify:
+            self.spotify_client: SpotifyClient = SpotifyClient()
+        else:
+            self.spotify_client = None
         self._config: DatabaseConfig = load_db_config()
         self.db_conn: connection = None
 

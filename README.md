@@ -97,16 +97,22 @@ poetry run pre-commit install --install-hooks
 ```
 ![image](./img/docker_desktop.png)
 
-### Step 4: Trigger MP3 Tag ETL
+### Step 4: Trigger Media Tag ETL
 ```
-# load local JSON file to Postgres
-poetry run python ./src/media_etl/run_pipeline.py
+# load local JSON file to postgres
+poetry run python ./src/spotify_tags_etl/run_pipeline.py
+
+# optional: query spotify for matching album, artist, track IDs:
+poetry run python ./src/spotify_tags_etl/run_pipeline.py --query-spotify
 ```
 
 ### Step 5: Run playlist ETL script
 ```
-# query Spotify 'Liked Songs' playlist and load to Postgres using SQLModel ORM libray
-poetry run python ./src/media_etl/run_playlist_etl.py
+# to only load JSON files (prior query to postgres using SQLModel ORM library:
+poetry run python ./src/spotify_tags_etl/run_playlist_etl.py
+
+# optional: query Spotify 'Liked Songs' and audio feature extraction, and load to postgres:
+poetry run python ./src/spotify_tags_etl/run_playlist_etl.py --query-spotify
 ```
 
 ![image](./img/tqdm_status.png)

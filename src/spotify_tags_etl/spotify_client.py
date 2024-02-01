@@ -28,7 +28,6 @@ from spotify_tags_etl.util.logger import init_logger, relative_size
 from spotify_tags_etl.util.settings import (
     API_PATH,
     DATA_PATH,
-    ENABLE_API,
     PROJECT_ROOT,
     SpotifyApiConfig,
     load_spotify_config,
@@ -50,8 +49,7 @@ class SpotifyClient:
         """Start Spotify API client to query tag data."""
         self.client: Spotify = None
         self._config: SpotifyApiConfig = load_spotify_config(environment="dev")
-        if ENABLE_API:
-            self.connect()
+        self.connect()
 
     def connect(self) -> bool:
         """Setup and test if OAuth2 client is successfully connected."""
@@ -257,7 +255,7 @@ class SpotifyClient:
                 self.log.error(f"{artist_name=} {artist_id=} {confidence=:0.2f}% {params=}")
         else:
             artist_id = OFFLINE_ARTIST_IDS.get(artist_name, "not_found")
-            self.log.info(f"{artist_name=} {artist_id=} ({ENABLE_API=})")
+            self.log.info(f"{artist_name=} {artist_id=}")
         return artist_id
 
     def get_album_id(self, artist_name: str, album_title: str, year: str) -> str:
@@ -284,7 +282,7 @@ class SpotifyClient:
                 self.log.error(f"{album_title=} {album_id=} {confidence=:0.2f}% {params=}")
         else:
             album_id = OFFLINE_ALBUM_IDS.get(album_title, "not_found")
-            self.log.info(f"{album_title=} {album_id=} ({ENABLE_API=})")
+            self.log.info(f"{album_title=} {album_id=}")
         return album_id
 
     def get_track_id(self, artist_name: str, album_title: str, track_title: str) -> str:
@@ -314,7 +312,7 @@ class SpotifyClient:
                 self.log.error(f"{artist_name=} {track_title=} {track_id=} {confidence=:0.2f}% {params=}")
         else:
             track_id = OFFLINE_TRACK_IDS.get(track_title, "not_found")
-            self.log.info(f"{artist_name=} {track_title=} {track_id=} ({ENABLE_API=})")
+            self.log.info(f"{artist_name=} {track_title=} {track_id=}")
         return track_id
 
     def convert_duration(self, value: int) -> Optional[pendulum.Time]:
