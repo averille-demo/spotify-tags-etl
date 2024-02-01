@@ -39,6 +39,22 @@ ruff = "*"
 sqlfluff = "*"
 toml-sort = "*"
 
+[tool.ruff]
+exclude = [
+    ".git",
+    ".venv",
+    ".vscode",
+]
+include = [
+    "pyproject.toml",
+    "src/**/*.py",
+]
+line-length = 120
+# enable pydocstyle errors/warnings, isort, and pylint
+select = ["E", "W", "I", "PL"]
+src = ["src", "test"]
+target-version = "py312"
+
 [tool.black]
 line-length = 120
 quiet = false

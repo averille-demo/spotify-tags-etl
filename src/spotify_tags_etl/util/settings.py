@@ -1,15 +1,18 @@
 """Parse pydantic settings for /config/*.toml and pyproject.toml.
 
+updated: 2024-01-31
 https://docs.pydantic.dev/usage/settings/
 """
+
 import platform
 import tomllib
 from pathlib import Path
 from typing import Any, Dict, Final, List, Optional
 
-from pydantic import AnyUrl, BaseSettings, confloat, conint, validator
+from pydantic import confloat, conint, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-ENABLE_API: Final[bool] = True
+ENABLE_API: Final[bool] = False
 DEBUG: Final[bool] = False
 
 VALID_DB_ENV = frozenset(("dev", "prod"))
@@ -32,7 +35,8 @@ if not SQL_PATH.is_dir():
 
 TOML_PATH: Final[Path] = Path(PROJECT_ROOT, "config", "settings_secret.toml")
 if not TOML_PATH.is_file():
-    raise FileNotFoundError(f"{TOML_PATH=}")
+    print(f"ERROR: update credentials in {TOML_PATH.name}")
+    TOML_PATH.write_text(Path(PROJECT_ROOT, "config", "settings_example.toml").read_text())
 
 PYPROJECT_PATH: Final[Path] = Path(PROJECT_ROOT, "pyproject.toml")
 if not PYPROJECT_PATH.is_file():
@@ -55,6 +59,8 @@ class DatabaseConfig(BaseSettings):
     https://docs.pydantic.dev/usage/settings/
     """
 
+    model_config = SettingsConfigDict(case_sensitive=True, secrets_dir=TOML_PATH.parent.as_posix())
+
     name: str
     timezone: str
     environment: str
@@ -65,13 +71,7 @@ class DatabaseConfig(BaseSettings):
     port: conint(gt=1024, lt=49151)  # type: ignore [valid-type]
     timeout: conint(gt=1, lt=10)  # type: ignore [valid-type]
 
-    class Config:
-        """Pydantic configuration subclass."""
-
-        secrets_dir = TOML_PATH.parent.as_posix()
-        case_sensitive = True
-
-    @validator("environment")
+    @field_validator("environment", mode="before")
     def check_environment(cls, env: str):
         """Validate toml setting."""
         if env not in VALID_DB_ENV:
@@ -113,28 +113,27 @@ class SpotifyApiConfig(BaseSettings):
     https://docs.pydantic.dev/usage/settings/
     """
 
+    model_config = SettingsConfigDict(case_sensitive=True, secrets_dir=TOML_PATH.parent.as_posix())
+
     client_id: str
     client_secret: str
-    redirect_uri: AnyUrl
+    redirect_uri: str
     port: conint(gt=1024, lt=49151)  # type: ignore [valid-type]
-    scopes: List[str] = ["user-library-read"]
+    scopes: str
     market: str = "US"
     api_timeout: confloat(gt=0.0, lt=5.0)  # type: ignore [valid-type]
     api_limit: conint(ge=1, le=50)  # type: ignore [valid-type]
     thold: confloat(gt=0.0, lt=100.0)  # type: ignore [valid-type]
 
-    class Config:
-        """Pydantic configuration subclass."""
-
-        secrets_dir = TOML_PATH.parent.as_posix()
-        case_sensitive = True
-
-    @validator("scopes")
-    def convert_list_to_comma_delimited_string(cls, elements: List) -> str:
+    @field_validator("scopes", mode="before")
+    def convert_list_to_comma_delimited_string(cls, scopes: List) -> str:
         """Create comma delimited string from list of values."""
-        if isinstance(elements, List):
-            return ",".join(elements)
-        return elements
+        if isinstance(scopes, str):
+            scopes = [scopes]
+        if isinstance(scopes, List):
+            return ",".join(scopes)
+        else:
+            raise ValueError(f"invalid input: {scopes=}")
 
 
 def load_spotify_config(
@@ -146,6 +145,7 @@ def load_spotify_config(
         SpotifyApiConfig: pydantic settings object
     """
     config = open_toml()
+
     return SpotifyApiConfig(
         client_id=config["spotify"][environment]["client_id"],
         client_secret=config["spotify"][environment]["client_secret"],
@@ -166,6 +166,8 @@ class PyProjectToolPoetry(BaseSettings):
     https://python-poetry.org/docs/pyproject/
     """
 
+    model_config = SettingsConfigDict(case_sensitive=True)
+
     host: str
     name: str
     version: str
@@ -177,11 +179,6 @@ class PyProjectToolPoetry(BaseSettings):
     documentation: Optional[str]
     keywords: Optional[List[str]]
 
-    class Config:
-        """Pydantic configuration subclass."""
-
-        case_sensitive = True
-
 
 def parse_pyproject() -> PyProjectToolPoetry:
     """Extract tool.poetry section from pyproject.toml."""
@@ -191,6 +188,7 @@ def parse_pyproject() -> PyProjectToolPoetry:
         "description",
         "license",
         "authors",
+        "readme",
         "repository",
         "documentation",
         "keywords",
@@ -218,6 +216,6 @@ def parse_pyproject() -> PyProjectToolPoetry:
 
 
 if __name__ == "__main__":
-    print(parse_pyproject())
-    print(load_db_config())
-    print(load_spotify_config())
+    print(f"{parse_pyproject()=}")
+    print(f"{load_db_config()=}")
+    print(f"{load_spotify_config()=}")

@@ -1,5 +1,5 @@
 [project]
-  name = "rdb_spotify_tags_etl_py"
+  name = "spotify_tags_etl"
   timezone = "America/Los_Angeles"
   sources = ["json.spotify.api", "json.media.parser"]
   sinks = ["postgres.db"]
@@ -8,9 +8,9 @@
 [postgres.dev]
   endpoint = "localhost"
   username = "some_user"
-  password = "some_password"
+  password = "some_password"  # avoid special characters
   database = "media_db"
-  port = 5454
+  port = 5454  # change port if needed
   timeout = 5
 
 # https://developer.spotify.com/documentation/web-api/
