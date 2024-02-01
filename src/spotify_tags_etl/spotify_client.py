@@ -3,6 +3,7 @@
 https://github.com/spotipy-dev/spotipy-examples/blob/main/showcases.ipynb
 https://developer.spotify.com/documentation/web-api/concepts/track-relinking
 """
+
 import json
 import re
 import time
@@ -36,6 +37,7 @@ from spotify_tags_etl.util.settings import (
 
 # compile once, use many times: keep commas, periods, colons, and hyphens
 RE_SYMBOLS = re.compile("[" + re.escape("""!"#$%&'()*+/;<=>?@[\\]^_`{|}~""") + "]")
+EXACT_MATCH = 100.0
 
 
 class SpotifyClient:
@@ -53,6 +55,7 @@ class SpotifyClient:
 
     def connect(self) -> bool:
         """Setup and test if OAuth2 client is successfully connected."""
+        cache_path = Path(PROJECT_ROOT, "config", ".cache")
         try:
             if isinstance(self._config, SpotifyApiConfig):
                 auth_manager = SpotifyOAuth(
@@ -61,7 +64,7 @@ class SpotifyClient:
                     redirect_uri=f"{self._config.redirect_uri}:{self._config.port}",
                     requests_timeout=2,
                     scope=self._config.scopes,
-                    cache_path=Path(PROJECT_ROOT, "config", ".cache"),
+                    cache_path=cache_path,
                 )
                 self.client = Spotify(
                     auth_manager=auth_manager,
@@ -73,6 +76,10 @@ class SpotifyClient:
                     return True
         except (SpotifyOauthError, SpotifyException):
             self.log.exception("unable to connect, check settings")
+            # prevent SpotifyOauthError: invalid_grant, error_description: 'Refresh token revoked'
+            if cache_path.is_file():
+                # remove old ./config/.cache
+                cache_path.unlink(missing_ok=True)
         return False
 
     def is_connected(self) -> bool:
@@ -150,7 +157,7 @@ class SpotifyClient:
             matches.append(fuzz_ratio)
             results["candidates"].append({"name": item["name"], "id": item.get("id"), "fuzz_ratio": fuzz_ratio})
             # skip scanning once identical match is found
-            if fuzz_ratio == 100.0:
+            if fuzz_ratio == EXACT_MATCH:
                 break
         # get index to list element with highest similarity match
         if matches:
@@ -169,6 +176,7 @@ class SpotifyClient:
 
         The Spotify API is more precise when removing symbols and unicode chars in search query
 
+        https://docs.python.org/3/library/unicodedata.html
         Args:
             text (str): string to convert (example: 'Björk' to 'Bjork')
             delimiter (str): single character used to replace symbols
@@ -416,7 +424,7 @@ class SpotifyClient:
     def query_audio_features(
         self,
         track_ids: List[str],
-    ) -> List[Dict[str, Any]]:
+    ) -> List[SQLModel]:
         """Get audio track features.
 
         https://developer.spotify.com/documentation/web-api/reference/get-audio-features
@@ -431,7 +439,7 @@ class SpotifyClient:
         Returns:
             SpotifyFavoriteModel: custom formatted SQLModel object
         """
-        models: List = []
+        models: List[SQLModel] = []
         if self.is_connected() and isinstance(track_ids, List) and len(track_ids) > 0:
             # partition track_ids into batches based on API limits
             for offset in tqdm(iterable=range(0, len(track_ids), self._config.api_limit), ascii=True):
@@ -506,7 +514,7 @@ class SpotifyClient:
                 else:
                     track_id = item["track"]["id"]
         """
-        models = []
+        models: List[SQLModel] = []
         track_ids = []
         if self.is_connected():
             # alternative to pagination, issue single request to find total number of tracks
