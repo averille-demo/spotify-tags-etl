@@ -259,6 +259,7 @@ class PostgresMedia:
             self.log.info(f"processing: {relative_size(path)}")
             try:
                 df = pd.read_json(path, orient="records", lines=True, encoding="utf-8")
+                # timestamp when local '.json' files were read
                 df["extract_date"] = pendulum.now(tz="UTC").to_iso8601_string()
                 if not self.load_df(df=df):
                     self.log.error(f"failed to load: {relative_size(path)}")

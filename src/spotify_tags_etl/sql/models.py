@@ -4,13 +4,15 @@ updated: 2024-01-31
 https://sqlmodel.tiangolo.com/
 """
 
-from datetime import date, datetime, time
 from typing import Optional
 
+import pendulum
 from pydantic import ConfigDict, condecimal, conint, field_validator
 from sqlmodel import Field, SQLModel, create_engine, inspect
 
 from spotify_tags_etl.util.settings import DatabaseConfig, load_db_config
+
+DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 VALID_TYPES = [
     "track",
@@ -25,21 +27,15 @@ VALID_TYPES = [
 
 # pylint: disable=[too-few-public-methods, no-self-argument]
 class SpotifyFavoriteModel(SQLModel, table=True):  # type: ignore [call-arg]
-    """Data model for Spotify 'Liked Song including subset of fields."""
+    """Data model for Spotify 'Liked Songs' playlist including subset of fields."""
 
     __table_args__ = {"extend_existing": True}
     __tablename__ = "liked_song"
 
     model_config = ConfigDict(
-        check_fields=True,
         populate_by_name=False,
         str_strip_whitespace=True,
         from_attributes=True,
-        json_encoders={
-            date: lambda d: d.strftime("%Y-%m-%d"),
-            time: lambda t: t.strftime("%H:%M:%S"),
-            datetime: lambda dt: dt.strftime("%Y-%m-%d %H:%M:%S"),
-        },
     )
 
     track_id: str = Field(default=None, primary_key=True)
@@ -48,14 +44,16 @@ class SpotifyFavoriteModel(SQLModel, table=True):  # type: ignore [call-arg]
     album_name: str
     track_name: str
     track_number: conint(ge=0)  # type: ignore [valid-type]
-    duration: Optional[time]
-    release_date: Optional[date]
+    duration: str
+    release_date: str
     # https://www.loudlab.org/blog/spotify-popularity-leverage-algorithm/
     popularity: conint(ge=0, le=100)  # type: ignore [valid-type]
-    added_at: Optional[datetime]
+    added_at: str
     external_url: str
-    extract_date: Optional[datetime]
-    load_date: Optional[datetime]
+    # timestamp data was pulled from spotify
+    extract_date: str = pendulum.now(tz="UTC").to_datetime_string()
+    # timestamp JSON was loaded to postgres
+    load_date: Optional[str]
 
     def to_string(self) -> str:
         """Helper abbreviated string representation."""
@@ -110,13 +108,9 @@ class SpotifyAudioFeatureModel(SQLModel, table=True):  # type: ignore [call-arg]
     __tablename__ = "audio_feature"
 
     model_config = ConfigDict(
-        check_fields=True,
         populate_by_name=False,
         str_strip_whitespace=True,
         from_attributes=True,
-        json_encoders={
-            datetime: lambda dt: dt.strftime("%Y-%m-%d %H:%M:%S"),
-        },
     )
 
     type: str
@@ -150,8 +144,10 @@ class SpotifyAudioFeatureModel(SQLModel, table=True):  # type: ignore [call-arg]
     valence: condecimal(ge=0.0, le=1.0, decimal_places=6) = Field(default=0.0)  # type: ignore [valid-type]
     track_href: str
     analysis_url: str
-    extract_date: Optional[datetime]
-    load_date: Optional[datetime]
+    # timestamp data was pulled from spotify
+    extract_date: str = pendulum.now(tz="UTC").to_datetime_string()
+    # timestamp JSON was loaded to postgres
+    load_date: Optional[str]
 
     def to_string(self) -> str:
         """Helper abbreviated string representation."""

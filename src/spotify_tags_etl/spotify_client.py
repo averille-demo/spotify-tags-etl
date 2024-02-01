@@ -415,7 +415,6 @@ class SpotifyClient:
                 popularity=item["track"]["popularity"],
                 added_at=self.convert_added_at(string=item["added_at"]),
                 external_url=item["track"]["external_urls"]["spotify"],
-                extract_date=pendulum.now(tz="UTC"),
             )
         except (KeyError, ValidationError, ParserError):
             self.log.exception(f"{item['track']['id']}")
@@ -453,7 +452,6 @@ class SpotifyClient:
                         feature["mode"] = str(feature["mode"])
                         # pass all kwargs to schema, in this case, all Spotify API keys match pydantic model
                         model = SpotifyAudioFeatureModel(**feature)
-                        model.extract_date = pendulum.now(tz="UTC")
                         models.append(model)
                     except ValidationError:
                         self.log.exception(f"{feature=}")

@@ -1,4 +1,5 @@
 """Driver to insert JSON music tags into PostgreSQL backend."""
+
 import time
 from pathlib import Path
 
