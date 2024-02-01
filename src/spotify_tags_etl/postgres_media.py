@@ -2,6 +2,7 @@
 
 https://www.psycopg.org/docs/index.html
 """
+
 from pathlib import Path
 from pprint import pprint
 from typing import Dict, List, Tuple
@@ -230,8 +231,8 @@ class PostgresMedia:
                                 f"INSERT INTO {table} ({', '.join(columns)}) "
                                 f"VALUES ({', '.join(['%s'] * len(columns))})"
                             )
-                            # select ordered subset of columns from series
-                            cursor.execute(query=query, vars=series[columns])
+                            # select ordered subset of column values from series
+                            cursor.execute(query=query, vars=series[columns].values)
                             if cursor.rowcount == 1:
                                 loaded_ok[track_tag] = True
                             else:
