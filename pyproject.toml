@@ -1,22 +1,24 @@
 [tool.poetry]
-name = "spotify-tags-etl"
-version = "0.1.4"
-description = "DEMO: load music tags to relational backend"
 authors = ["Emile Averill <cloud.apps@averille.dev>"]
-readme = "README.md"
-license = "MIT"
+description = "DEMO: load music tags to relational backend"
 keywords = ["spotify", "tags"]
+license = "MIT"
+name = "spotify-tags-etl"
 packages = [
-    { include = "spotify_tags_etl", from = "src" },
+    {from = "src", include = "spotify_tags_etl"},
 ]
+readme = "README.md"
+version = "0.1.5"
 
 [tool.poetry.dependencies]
-python = "^3.11"
 pandas = "*"
 pathvalidate = "*"
 pendulum = "*"
 psycopg2-binary = "*"
+pyarrow = "*"
 pydantic = "*"
+pydantic-settings = "*"
+python = "^3.12"
 rapidfuzz = "*"
 requests = "*"
 spotipy = "*"
@@ -33,54 +35,65 @@ pydocstyle = "*"
 pylint = "*"
 pytest = "*"
 pytest-cov = "*"
+ruff = "*"
 sqlfluff = "*"
+toml-sort = "*"
 
 [tool.black]
 line-length = 120
-target-version = ["py311"]
 quiet = false
+target-version = ["py312"]
 
 [tool.isort]
-py_version = 311
-profile = "black"
 combine_as_imports = true
-use_parentheses = true
-src_paths = ["src", "tests"]
-skip = [".gitignore", ".dockerignore"]
-line_length = 120
 ensure_newline_before_comments = true
+line_length = 120
+profile = "black"
+py_version = 312
+skip = [".dockerignore", ".gitignore", ".venv"]
+src_paths = ["src", "tests"]
+use_parentheses = true
+
+[tool.tomlsort]
+all = true
+in_place = true
+no_sort_tables = true
+sort_inline_arrays = true
+sort_inline_tables = true
+spaces_indent_inline_array = 4
+trailing_comma_inline_array = true
 
 [tool.mypy]
-python_version = "3.11"
-files = "*.py"
-mypy_path = "src"
-explicit_package_bases = false
-namespace_packages = true
-ignore_missing_imports = false
-no_implicit_optional = true
-pretty = true
-show_error_codes = true
 check_untyped_defs = true
 disable_error_code = [
-    "import"
+    "import",
 ]
+explicit_package_bases = false
+files = "*.py"
+ignore_missing_imports = false
+mypy_path = "src"
+namespace_packages = true
+no_implicit_optional = true
+pretty = true
+python_version = "3.12"
+show_error_codes = true
 
 [tool.pydocstyle]
 convention = "google"
 
 [tool.pylint.messages_control]
-max-line-length = 120
-extension-pkg-allow-list = ["pydantic"]
 disable = [
     "consider-using-dict-items",
-    "logging-fstring-interpolation",
     "invalid-name",
+    "logging-fstring-interpolation",
 ]
+extension-pkg-allow-list = ["pydantic"]
+max-line-length = 120
 
 [tool.pytest.ini_options]
 pythonpath = [".", "src"]
 testpaths = [".", "tests"]
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+requires = ["poetry-core>=1.0.0"]
