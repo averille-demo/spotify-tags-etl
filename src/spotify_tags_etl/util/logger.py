@@ -13,7 +13,7 @@ def get_readable_size(path: Path) -> str:
     block_size = 1000.0
     if path.is_file():
         file_size = float(path.stat().st_size)
-        for unit in ["B", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"]:
+        for unit in ["B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB"]:
             if abs(file_size) < block_size:
                 return f"({file_size:03.2f} {unit})"
             file_size /= block_size

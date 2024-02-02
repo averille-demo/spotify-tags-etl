@@ -23,7 +23,11 @@ from sqlmodel import SQLModel
 from tqdm import tqdm
 
 from spotify_tags_etl.sql.models import SpotifyAudioFeatureModel, SpotifyFavoriteModel
-from spotify_tags_etl.sql.offline_ids import OFFLINE_ALBUM_IDS, OFFLINE_ARTIST_IDS, OFFLINE_TRACK_IDS
+from spotify_tags_etl.sql.offline_ids import (
+    OFFLINE_ALBUM_IDS,
+    OFFLINE_ARTIST_IDS,
+    OFFLINE_TRACK_IDS,
+)
 from spotify_tags_etl.util.logger import init_logger, relative_size
 from spotify_tags_etl.util.settings import (
     API_PATH,
@@ -99,7 +103,13 @@ class SpotifyClient:
                 if not path.parent.is_dir():
                     path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(
-                    data=json.dumps(results, indent=2, sort_keys=False, ensure_ascii=False, default=str),
+                    data=json.dumps(
+                        results,
+                        indent=2,
+                        sort_keys=False,
+                        ensure_ascii=False,
+                        default=str,
+                    ),
                     encoding="utf-8",
                 )
         except (ValueError, json.JSONDecodeError):

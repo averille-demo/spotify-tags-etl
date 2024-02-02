@@ -14,7 +14,13 @@ from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT, connection
 from psycopg2.extras import NamedTupleCursor
 from spotify_client import SpotifyClient
 from util.logger import init_logger, relative_size
-from util.settings import DATA_PATH, SQL_PATH, DatabaseConfig, load_db_config, parse_pyproject
+from util.settings import (
+    DATA_PATH,
+    SQL_PATH,
+    DatabaseConfig,
+    load_db_config,
+    parse_pyproject,
+)
 
 pd.set_option("display.max_rows", 128)
 pd.set_option("expand_frame_repr", False)
@@ -80,7 +86,12 @@ class PostgresMedia:
             pg_ver = str(self.db_conn.server_version)
             print(f"database: {self._config.database}\t version: {pg_ver}")
             self.show_tables()
-        except (AttributeError, psycopg2.DatabaseError, psycopg2.InterfaceError, psycopg2.OperationalError):
+        except (
+            AttributeError,
+            psycopg2.DatabaseError,
+            psycopg2.InterfaceError,
+            psycopg2.OperationalError,
+        ):
             self.log.exception(f"{self._config.database}")
 
     def query(self, query: str, params: List) -> List[Tuple]:
@@ -101,7 +112,12 @@ class PostgresMedia:
                     # convert mogrify() bytes to string with decode()
                     print(params_query.decode())
                     pprint(object=result_set, indent=2, width=120, compact=True)
-        except (SyntaxError, psycopg2.DatabaseError, psycopg2.InterfaceError, psycopg2.OperationalError):
+        except (
+            SyntaxError,
+            psycopg2.DatabaseError,
+            psycopg2.InterfaceError,
+            psycopg2.OperationalError,
+        ):
             self.log.exception(f"{query}")
         return result_set
 
@@ -117,7 +133,11 @@ class PostgresMedia:
                 else:
                     self.log.info(f"rolname: '{result_set[0]}' found")
                     return True
-        except (psycopg2.DatabaseError, psycopg2.InterfaceError, psycopg2.OperationalError):
+        except (
+            psycopg2.DatabaseError,
+            psycopg2.InterfaceError,
+            psycopg2.OperationalError,
+        ):
             self.log.exception(f"rolname: {role_name}")
         return False
 
@@ -136,7 +156,11 @@ class PostgresMedia:
                         cursor.execute(query, [role_name, password])
                         self.log.info(f"added role: '{role_name}'")
                         return True
-        except (psycopg2.DatabaseError, psycopg2.InterfaceError, psycopg2.OperationalError):
+        except (
+            psycopg2.DatabaseError,
+            psycopg2.InterfaceError,
+            psycopg2.OperationalError,
+        ):
             self.log.exception(f"failed to add role: '{role_name}'")
         return False
 
@@ -159,7 +183,11 @@ class PostgresMedia:
                     cursor.execute(query)
                     self.log.info(f"database: '{self._config.database}' created")
                     return True
-        except (psycopg2.DatabaseError, psycopg2.InterfaceError, psycopg2.OperationalError):
+        except (
+            psycopg2.DatabaseError,
+            psycopg2.InterfaceError,
+            psycopg2.OperationalError,
+        ):
             self.log.exception(f"database: '{self._config.database}'")
         return False
 
@@ -172,7 +200,11 @@ class PostgresMedia:
                     if cursor.rowcount == -1:
                         # query was successful
                         return True
-        except (psycopg2.DatabaseError, psycopg2.InterfaceError, psycopg2.OperationalError):
+        except (
+            psycopg2.DatabaseError,
+            psycopg2.InterfaceError,
+            psycopg2.OperationalError,
+        ):
             self.log.exception(f"{self._config.database}")
         return False
 
@@ -241,7 +273,11 @@ class PostgresMedia:
                             else:
                                 self.log.error(f"{table} insert row: {track_tag}")
                                 loaded_ok[track_tag] = False
-                    except (pd.errors.DtypeWarning, pd.errors.ParserWarning, psycopg2.DatabaseError):
+                    except (
+                        pd.errors.DtypeWarning,
+                        pd.errors.ParserWarning,
+                        psycopg2.DatabaseError,
+                    ):
                         self.log.exception(f"table: {table} track: '{track_tag}'")
         # only return true if all inserts were successful
         return next((status for status in list(loaded_ok.values())), True)

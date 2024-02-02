@@ -1,4 +1,5 @@
 """Tests for parsing database credentials as pydantic settings."""
+
 import pytest
 
 from spotify_tags_etl.util import settings
@@ -8,7 +9,17 @@ def test_load_postgres_settings():
     """Check if parsing TOML to pydantic settings was successful."""
     config = settings.load_db_config()
     assert isinstance(config, settings.DatabaseConfig)
-    for attr in ["name", "timezone", "environment", "endpoint", "username", "password", "database", "port", "timeout"]:
+    for attr in [
+        "name",
+        "timezone",
+        "environment",
+        "endpoint",
+        "username",
+        "password",
+        "database",
+        "port",
+        "timeout",
+    ]:
         assert hasattr(config, attr)
 
 

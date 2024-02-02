@@ -50,25 +50,20 @@ include = [
     "src/**/*.py",
 ]
 line-length = 120
-# enable pydocstyle errors/warnings, isort, and pylint
-select = ["E", "W", "I", "PL"]
+select = [
+    "E", # pycodestyle (error)
+    "I", # isort
+    "PL", # pylint
+    "W", # pycodestyle (warning)
+]
 src = ["src", "test"]
 target-version = "py312"
 
-[tool.black]
-line-length = 120
-quiet = false
-target-version = ["py312"]
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
-[tool.isort]
-combine_as_imports = true
-ensure_newline_before_comments = true
-line_length = 120
-profile = "black"
-py_version = 312
-skip = [".dockerignore", ".gitignore", ".venv"]
-src_paths = ["src", "tests"]
-use_parentheses = true
+[tool.ruff.isort]
+combine-as-imports = true
 
 [tool.tomlsort]
 all = true
@@ -93,18 +88,6 @@ no_implicit_optional = true
 pretty = true
 python_version = "3.12"
 show_error_codes = true
-
-[tool.pydocstyle]
-convention = "google"
-
-[tool.pylint.messages_control]
-disable = [
-    "consider-using-dict-items",
-    "invalid-name",
-    "logging-fstring-interpolation",
-]
-extension-pkg-allow-list = ["pydantic"]
-max-line-length = 120
 
 [tool.pytest.ini_options]
 pythonpath = [".", "src"]

@@ -1,4 +1,5 @@
 """Tests for parsing spotify credentials as pydantic settings."""
+
 import pytest
 
 from spotify_tags_etl.util import settings
